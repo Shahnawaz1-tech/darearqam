@@ -23,10 +23,16 @@ export default function Login({ status, canResetPassword }: Props) {
             <Form
                 {...store.form()}
                 resetOnSuccess={['password']}
-                className="flex flex-col gap-6"
+                className="flex flex-col gap-6 rounded-2xl border border-border/70 bg-card p-5 shadow-sm sm:p-7"
             >
                 {({ processing, errors }) => (
                     <>
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium">Welcome back</p>
+                            <p className="text-sm text-muted-foreground">
+                                Sign in to continue to your Madrasa workspace.
+                            </p>
+                        </div>
                         <div className="grid gap-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email address</Label>
@@ -67,7 +73,7 @@ export default function Login({ status, canResetPassword }: Props) {
                                 <InputError message={errors.password} />
                             </div>
 
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center gap-3">
                                 <Checkbox
                                     id="remember"
                                     name="remember"

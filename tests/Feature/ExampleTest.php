@@ -1,7 +1,8 @@
 <?php
 
-test('returns a successful response', function () {
+test('guests see the welcome page', function () {
     $response = $this->get(route('home'));
 
-    $response->assertOk();
+    $response->assertOk()
+        ->assertInertia(fn ($page) => $page->component('welcome'));
 });
