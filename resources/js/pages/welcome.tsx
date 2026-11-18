@@ -4,10 +4,19 @@ import {
     ArrowLeft,
     ArrowUpLeft,
     BookOpen,
+    CalendarDays,
+    CheckCircle2,
+    ExternalLink,
     GraduationCap,
     HeartHandshake,
+    Mail,
+    MapPin,
+    Phone,
+    Search,
     Sparkles,
+    UsersRound,
 } from 'lucide-react';
+import { useState } from 'react';
 import { dashboard, login } from '@/routes';
 
 const programs = [
@@ -32,10 +41,77 @@ const programs = [
         description:
             'ضروری دینی معلومات، سیرتِ نبوی ﷺ اور روزمرہ زندگی کے اچھے آداب۔',
     },
+    {
+        icon: BookOpen,
+        number: '۰۴',
+        title: 'درسِ نظامی',
+        description:
+            'دینی علوم، عربی اور بنیادی متون کا منظم نصاب اور مسلسل مطالعہ۔',
+    },
+    {
+        icon: GraduationCap,
+        number: '۰۵',
+        title: 'عربی زبان',
+        description:
+            'عربی زبان اور قواعد کی مرحلہ وار تعلیم تاکہ طلبہ دینی متون سمجھ سکیں۔',
+    },
+    {
+        icon: Sparkles,
+        number: '۰۶',
+        title: 'عصری مضامین',
+        description: 'اردو، انگریزی، ریاضی اور مفید بنیادی مہارتوں کی تعلیم۔',
+    },
+];
+
+const resources = [
+    {
+        title: 'داخلہ رہنمائی',
+        description: 'داخلے کے طریقے اور ضروری دستاویزات جانیں۔',
+        keywords: 'admission داخلہ درخواست فارم',
+        href: '#admissions',
+    },
+    {
+        title: 'امتحان اور اعلانات',
+        description: 'تازہ امتحانی معلومات کے لیے مدرسے سے رابطہ کریں۔',
+        keywords: 'exam date sheet timetable امتحان اعلان',
+        href: '#notices',
+    },
+    {
+        title: 'تعلیمی شعبے',
+        description: 'قرآن، حفظ، دینی اور عصری تعلیم کا تعارف۔',
+        keywords: 'program courses hifz حفظ نصاب',
+        href: '#programs',
+    },
+    {
+        title: 'طلبہ و سرپرست پورٹل',
+        description: 'اپنے اکاؤنٹ میں داخل ہونے کے لیے لاگ اِن کریں۔',
+        keywords: 'student parent portal login لاگ ان',
+        href: login.url(),
+    },
+    {
+        title: 'وفاق المدارس',
+        description: 'وفاق المدارس کی سرکاری ویب سائٹ ملاحظہ کریں۔',
+        keywords: 'wifaq madaris وفاق المدارس',
+        href: 'https://www.wifaqulmadaris.org/',
+        external: true,
+    },
+    {
+        title: 'سوال و جواب',
+        description: 'جامعہ بنوری ٹاؤن کی علمی رہنمائی ملاحظہ کریں۔',
+        keywords: 'fatwa question answer فتوی سوال جواب',
+        href: 'https://www.banuri.edu.pk/new-questions',
+        external: true,
+    },
 ];
 
 export default function Welcome() {
     const { auth } = usePage().props;
+    const [resourceQuery, setResourceQuery] = useState('');
+    const filteredResources = resources.filter((resource) =>
+        `${resource.title} ${resource.description} ${resource.keywords}`
+            .toLocaleLowerCase()
+            .includes(resourceQuery.trim().toLocaleLowerCase()),
+    );
 
     return (
         <>
@@ -70,7 +146,7 @@ export default function Welcome() {
 
                     <nav
                         aria-label="مرکزی نیویگیشن"
-                        className="order-3 flex w-full items-center justify-center gap-6 border-t border-[#e7e9e1] pt-4 text-sm font-medium text-[#526c61] sm:order-none sm:w-auto sm:gap-8 sm:border-0 sm:pt-0"
+                        className="order-3 flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-3 border-t border-[#e7e9e1] pt-4 text-sm font-medium text-[#526c61] sm:order-none sm:w-auto sm:gap-x-6 sm:border-0 sm:pt-0"
                     >
                         <a
                             className="transition hover:text-[#bd8540]"
@@ -90,6 +166,24 @@ export default function Welcome() {
                         >
                             ہمارا عزم
                         </a>
+                        <a
+                            className="transition hover:text-[#bd8540]"
+                            href="#admissions"
+                        >
+                            داخلہ
+                        </a>
+                        <a
+                            className="transition hover:text-[#bd8540]"
+                            href="#results"
+                        >
+                            نتائج
+                        </a>
+                        <a
+                            className="transition hover:text-[#bd8540]"
+                            href="#contact"
+                        >
+                            رابطہ
+                        </a>
                     </nav>
 
                     {auth.user ? (
@@ -105,7 +199,7 @@ export default function Welcome() {
                             href={login()}
                             className="inline-flex items-center gap-2 rounded-full border border-[#d6dfd7] px-5 py-2.5 text-sm font-semibold text-[#285845] transition hover:border-[#285845] hover:bg-[#f1f5ef]"
                         >
-                            طالب علم پورٹل
+                            پورٹل میں داخل ہوں
                             <ArrowUpLeft aria-hidden="true" size={16} />
                         </Link>
                     )}
@@ -308,6 +402,480 @@ export default function Welcome() {
                                     </article>
                                 );
                             })}
+                        </div>
+                    </section>
+
+                    <section
+                        id="teachers"
+                        className="border-y border-[#ecece4] bg-white"
+                    >
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
+                            <div className="mx-auto max-w-3xl text-center">
+                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
+                                    اساتذہ اور رہنمائی
+                                </p>
+                                <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
+                                    ہر طالب علم کے سیکھنے میں ساتھ
+                                </h2>
+                                <p className="mt-4 text-sm leading-7 text-[#718178] sm:text-base">
+                                    تدریسی ٹیم قرآن، دینی نصاب اور مفید عصری
+                                    مضامین میں طلبہ کی رہنمائی کرتی ہے۔ اساتذہ،
+                                    کلاسوں اور مضامین کی تازہ تفصیل کے لیے مدرسے
+                                    سے رابطہ کریں۔
+                                </p>
+                            </div>
+                            <div className="mt-10 grid gap-5 md:grid-cols-3">
+                                {[
+                                    {
+                                        icon: BookOpen,
+                                        title: 'دینی تعلیم',
+                                        description:
+                                            'قرآنِ کریم، تجوید اور دینی نصاب میں رہنمائی۔',
+                                    },
+                                    {
+                                        icon: UsersRound,
+                                        title: 'طلبہ کی معاونت',
+                                        description:
+                                            'حاضری، تعلیمی پیش رفت اور والدین سے رابطے پر توجہ۔',
+                                    },
+                                    {
+                                        icon: HeartHandshake,
+                                        title: 'کردار سازی',
+                                        description:
+                                            'احترام، ذمہ داری اور اچھے آداب کو روزمرہ تعلیم میں شامل کرنا۔',
+                                    },
+                                ].map(({ icon: Icon, title, description }) => (
+                                    <article
+                                        key={title}
+                                        className="rounded-3xl border border-[#e8ebe3] bg-[#fbfaf6] p-6 sm:p-7"
+                                    >
+                                        <span className="flex size-12 items-center justify-center rounded-2xl bg-[#eef3ec] text-[#3d6c51]">
+                                            <Icon
+                                                aria-hidden="true"
+                                                size={23}
+                                            />
+                                        </span>
+                                        <h3 className="mt-5 text-lg font-bold text-[#234739]">
+                                            {title}
+                                        </h3>
+                                        <p className="mt-2 text-sm leading-7 text-[#718178]">
+                                            {description}
+                                        </p>
+                                    </article>
+                                ))}
+                            </div>
+                            <div className="mt-7 text-center">
+                                <a
+                                    href="#contact"
+                                    className="inline-flex items-center gap-2 rounded-full border border-[#d6dfd7] px-5 py-3 text-sm font-semibold text-[#285845] transition hover:bg-[#f1f5ef]"
+                                >
+                                    تدریسی ٹیم کے بارے میں پوچھیں
+                                    <ArrowLeft aria-hidden="true" size={16} />
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section
+                        id="resources"
+                        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
+                    >
+                        <div className="mx-auto max-w-3xl text-center">
+                            <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
+                                معلومات و رہنمائی
+                            </p>
+                            <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
+                                اہم معلومات ایک جگہ
+                            </h2>
+                            <p className="mt-4 text-sm leading-7 text-[#718178] sm:text-base">
+                                داخلے، تعلیمی شعبوں اور سرکاری پورٹلز تک آسان
+                                رسائی حاصل کریں۔
+                            </p>
+                        </div>
+
+                        <div className="relative mx-auto mt-8 max-w-xl">
+                            <Search
+                                aria-hidden="true"
+                                className="absolute top-1/2 right-4 -translate-y-1/2 text-[#789087]"
+                                size={18}
+                            />
+                            <label
+                                className="sr-only"
+                                htmlFor="resource-search"
+                            >
+                                معلومات تلاش کریں
+                            </label>
+                            <input
+                                id="resource-search"
+                                type="search"
+                                value={resourceQuery}
+                                onChange={(event) =>
+                                    setResourceQuery(event.target.value)
+                                }
+                                placeholder="مثلاً داخلہ، امتحان، نتائج"
+                                className="h-12 w-full rounded-2xl border border-[#dfe5dc] bg-white pr-12 pl-4 text-sm text-[#234739] transition outline-none placeholder:text-[#9aa69c] focus:border-[#75917e] focus:ring-4 focus:ring-[#1d5140]/10"
+                            />
+                        </div>
+
+                        {filteredResources.length > 0 ? (
+                            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                {filteredResources.map((resource) => {
+                                    const cardClassName =
+                                        'group rounded-2xl border border-[#e8ebe3] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#cbd9cc] hover:shadow-lg hover:shadow-[#1b4131]/5';
+                                    const cardContent = (
+                                        <>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <h3 className="font-bold text-[#234739]">
+                                                    {resource.title}
+                                                </h3>
+                                                {resource.external && (
+                                                    <ExternalLink
+                                                        aria-hidden="true"
+                                                        size={16}
+                                                        className="shrink-0 text-[#789087]"
+                                                    />
+                                                )}
+                                            </div>
+                                            <p className="mt-2 text-sm leading-6 text-[#718178]">
+                                                {resource.description}
+                                            </p>
+                                        </>
+                                    );
+
+                                    if (resource.external) {
+                                        return (
+                                            <a
+                                                key={resource.title}
+                                                href={resource.href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={cardClassName}
+                                            >
+                                                {cardContent}
+                                            </a>
+                                        );
+                                    }
+
+                                    if (resource.href.startsWith('#')) {
+                                        return (
+                                            <a
+                                                key={resource.title}
+                                                href={resource.href}
+                                                className={cardClassName}
+                                            >
+                                                {cardContent}
+                                            </a>
+                                        );
+                                    }
+
+                                    return (
+                                        <Link
+                                            key={resource.title}
+                                            href={resource.href}
+                                            className={cardClassName}
+                                        >
+                                            {cardContent}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p
+                                className="mt-7 text-center text-sm text-[#718178]"
+                                role="status"
+                            >
+                                اس تلاش سے متعلق معلومات نہیں ملیں۔
+                            </p>
+                        )}
+                    </section>
+
+                    <section
+                        id="admissions"
+                        className="border-y border-[#ecece4] bg-white"
+                    >
+                        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:gap-16 lg:px-12">
+                            <div>
+                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
+                                    داخلہ
+                                </p>
+                                <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
+                                    داخلے کے بارے میں رہنمائی
+                                </h2>
+                                <p className="mt-4 max-w-2xl text-sm leading-7 text-[#718178] sm:text-base">
+                                    داخلے کی دستیابی، عمر اور مطلوبہ دستاویزات
+                                    کی تصدیق براہِ راست مدرسے سے کریں۔ آن لائن
+                                    درخواست فارم فی الحال منسلک نہیں ہے۔
+                                </p>
+                                <ol className="mt-8 grid gap-4 sm:grid-cols-2">
+                                    {[
+                                        'داخلے کی دستیابی کے لیے رابطہ کریں۔',
+                                        'طالب علم کی سابقہ تعلیمی تفصیل پوچھیں۔',
+                                        'ضروری دستاویزات کی فہرست حاصل کریں۔',
+                                        'مدرسے سے ملاقات کا وقت طے کریں۔',
+                                    ].map((step, index) => (
+                                        <li
+                                            key={step}
+                                            className="flex items-start gap-3 rounded-2xl bg-[#f7f8f3] p-4"
+                                        >
+                                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#1d5140] text-sm font-bold text-white">
+                                                {index + 1}
+                                            </span>
+                                            <span className="pt-1 text-sm leading-6 text-[#526c61]">
+                                                {step}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+
+                            <aside className="rounded-3xl bg-[#f7f6ef] p-6 sm:p-8">
+                                <div className="flex size-12 items-center justify-center rounded-2xl bg-white text-[#3d6c51]">
+                                    <CheckCircle2
+                                        aria-hidden="true"
+                                        size={24}
+                                    />
+                                </div>
+                                <h3 className="mt-5 text-xl font-bold text-[#234739]">
+                                    داخلے کی معلومات حاصل کریں
+                                </h3>
+                                <p className="mt-3 text-sm leading-7 text-[#718178]">
+                                    تازہ داخلہ شیڈول، فیس اور دستاویزات کی تصدیق
+                                    فون یا ای میل کے ذریعے کریں۔
+                                </p>
+                                <div className="mt-6 flex flex-col gap-3">
+                                    <a
+                                        href="tel:+923349798988"
+                                        className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1d5140] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#173f34]"
+                                    >
+                                        <Phone aria-hidden="true" size={16} />
+                                        مدرسے کو کال کریں
+                                    </a>
+                                    <a
+                                        href="mailto:qarimuhammadarif988@gmail.com"
+                                        className="inline-flex items-center justify-center gap-2 rounded-full border border-[#d6dfd7] px-5 py-3 text-sm font-semibold text-[#285845] transition hover:bg-white"
+                                    >
+                                        <Mail aria-hidden="true" size={16} />
+                                        ای میل بھیجیں
+                                    </a>
+                                </div>
+                            </aside>
+                        </div>
+                    </section>
+
+                    <section
+                        id="notices"
+                        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
+                    >
+                        <div className="mx-auto max-w-3xl text-center">
+                            <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
+                                اعلانات
+                            </p>
+                            <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
+                                تازہ نوٹس اور امتحانی معلومات
+                            </h2>
+                        </div>
+                        <div className="mx-auto mt-8 flex max-w-3xl items-start gap-4 rounded-3xl border border-[#e8ebe3] bg-white p-6 sm:p-8">
+                            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#eef3ec] text-[#3d6c51]">
+                                <CalendarDays aria-hidden="true" size={23} />
+                            </span>
+                            <div>
+                                <h3 className="font-bold text-[#234739]">
+                                    فی الحال کوئی تازہ نوٹس شائع نہیں ہوا
+                                </h3>
+                                <p className="mt-2 text-sm leading-7 text-[#718178]">
+                                    امتحان کی تاریخ، ڈیٹ شیٹ یا کسی اعلان کی
+                                    تصدیق کے لیے مدرسے سے رابطہ کریں۔
+                                </p>
+                                <a
+                                    href="tel:+923349798988"
+                                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#285845] transition hover:text-[#b57d38]"
+                                >
+                                    <Phone aria-hidden="true" size={15} />
+                                    0092 334 9798988
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section
+                        id="results"
+                        className="border-y border-[#ecece4] bg-white"
+                    >
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
+                            <div className="mx-auto max-w-3xl text-center">
+                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
+                                    نتائج
+                                </p>
+                                <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
+                                    نتائج کے بارے میں معلومات
+                                </h2>
+                                <p className="mt-4 text-sm leading-7 text-[#718178]">
+                                    غلط یا آزمائشی نمبروں کے بجائے، سرکاری نتیجے
+                                    کے لیے درست پورٹل یا مدرسے سے رجوع کریں۔
+                                </p>
+                            </div>
+                            <div className="mt-8 grid gap-5 md:grid-cols-2">
+                                <article className="rounded-3xl border border-[#e8ebe3] bg-[#fbfaf6] p-6 sm:p-8">
+                                    <BookOpen
+                                        aria-hidden="true"
+                                        className="text-[#3d6c51]"
+                                        size={27}
+                                    />
+                                    <h3 className="mt-5 text-xl font-bold text-[#234739]">
+                                        مدرسے کے داخلی نتائج
+                                    </h3>
+                                    <p className="mt-3 text-sm leading-7 text-[#718178]">
+                                        آن لائن داخلی نتیجہ تلاش اس وقت دستیاب
+                                        نہیں۔ اپنے رول نمبر کے ساتھ مدرسے سے
+                                        براہِ راست تصدیق کریں۔
+                                    </p>
+                                    <a
+                                        href="tel:+923349798988"
+                                        className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#285845]"
+                                    >
+                                        <Phone aria-hidden="true" size={15} />
+                                        نتیجے کے لیے رابطہ کریں
+                                    </a>
+                                </article>
+                                <article className="rounded-3xl border border-[#e8ebe3] bg-[#fbfaf6] p-6 sm:p-8">
+                                    <GraduationCap
+                                        aria-hidden="true"
+                                        className="text-[#3d6c51]"
+                                        size={29}
+                                    />
+                                    <h3 className="mt-5 text-xl font-bold text-[#234739]">
+                                        وفاق المدارس
+                                    </h3>
+                                    <p className="mt-3 text-sm leading-7 text-[#718178]">
+                                        وفاق المدارس سے متعلق تازہ معلومات کے
+                                        لیے اس کی سرکاری ویب سائٹ استعمال کریں۔
+                                    </p>
+                                    <a
+                                        href="https://www.wifaqulmadaris.org/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#285845]"
+                                    >
+                                        سرکاری ویب سائٹ
+                                        <ExternalLink
+                                            aria-hidden="true"
+                                            size={15}
+                                        />
+                                    </a>
+                                </article>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section
+                        id="position-holders"
+                        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
+                    >
+                        <div className="mx-auto max-w-3xl rounded-3xl border border-dashed border-[#cbd9cc] bg-white p-7 text-center sm:p-10">
+                            <GraduationCap
+                                aria-hidden="true"
+                                className="mx-auto text-[#3d6c51]"
+                                size={34}
+                            />
+                            <h2 className="mt-4 text-2xl font-bold text-[#183b32]">
+                                نمایاں طلبہ
+                            </h2>
+                            <p className="mt-3 text-sm leading-7 text-[#718178]">
+                                تصدیق شدہ امتحانی نتائج دستیاب ہونے پر نمایاں
+                                طلبہ کی تفصیل یہاں شامل کی جائے گی۔
+                            </p>
+                        </div>
+                    </section>
+
+                    <section
+                        id="contact"
+                        className="border-y border-[#ecece4] bg-white"
+                    >
+                        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:px-12">
+                            <div>
+                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
+                                    رابطہ
+                                </p>
+                                <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
+                                    ہم سے رابطہ کریں
+                                </h2>
+                                <p className="mt-4 text-sm leading-7 text-[#718178]">
+                                    داخلے، نصاب یا امتحان سے متعلق تصدیق شدہ
+                                    معلومات کے لیے مدرسے سے براہِ راست رابطہ
+                                    کریں۔
+                                </p>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <a
+                                    href="tel:+923349798988"
+                                    dir="ltr"
+                                    className="flex items-start gap-4 rounded-2xl border border-[#e8ebe3] p-5 text-right transition hover:border-[#cbd9cc]"
+                                >
+                                    <Phone
+                                        aria-hidden="true"
+                                        className="mt-1 shrink-0 text-[#3d6c51]"
+                                        size={20}
+                                    />
+                                    <span>
+                                        <span className="block font-bold text-[#234739]">
+                                            فون / واٹس ایپ
+                                        </span>
+                                        <span className="mt-1 block text-sm text-[#718178]">
+                                            0092 334 9798988
+                                        </span>
+                                    </span>
+                                </a>
+                                <a
+                                    href="mailto:qarimuhammadarif988@gmail.com"
+                                    dir="ltr"
+                                    className="flex items-start gap-4 rounded-2xl border border-[#e8ebe3] p-5 text-right transition hover:border-[#cbd9cc]"
+                                >
+                                    <Mail
+                                        aria-hidden="true"
+                                        className="mt-1 shrink-0 text-[#3d6c51]"
+                                        size={20}
+                                    />
+                                    <span className="min-w-0">
+                                        <span className="block font-bold text-[#234739]">
+                                            ای میل
+                                        </span>
+                                        <span className="mt-1 block text-sm break-all text-[#718178]">
+                                            qarimuhammadarif988@gmail.com
+                                        </span>
+                                    </span>
+                                </a>
+                                <div className="flex items-start gap-4 rounded-2xl border border-[#e8ebe3] p-5">
+                                    <MapPin
+                                        aria-hidden="true"
+                                        className="mt-1 shrink-0 text-[#3d6c51]"
+                                        size={20}
+                                    />
+                                    <span>
+                                        <span className="block font-bold text-[#234739]">
+                                            پتہ
+                                        </span>
+                                        <span className="mt-1 block text-sm text-[#718178]">
+                                            گرگری، پاکستان
+                                        </span>
+                                    </span>
+                                </div>
+                                <div className="flex items-start gap-4 rounded-2xl border border-[#e8ebe3] p-5">
+                                    <CalendarDays
+                                        aria-hidden="true"
+                                        className="mt-1 shrink-0 text-[#3d6c51]"
+                                        size={20}
+                                    />
+                                    <span>
+                                        <span className="block font-bold text-[#234739]">
+                                            دفتری اوقات
+                                        </span>
+                                        <span className="mt-1 block text-sm text-[#718178]">
+                                            ہفتہ تا جمعرات، صبح 8 بجے تا دوپہر 2
+                                            بجے
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
