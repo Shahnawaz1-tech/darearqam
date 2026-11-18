@@ -28,6 +28,14 @@ test('authenticated users without a tenant can visit the onboarding dashboard', 
         ->assertInertia(fn ($page) => $page->component('dashboard'));
 });
 
+test('unlinked parent accounts see the review screen instead of tenant onboarding', function () {
+    $parent = User::factory()->create(['is_parent_account' => true]);
+
+    $this->actingAs($parent)
+        ->get(route('dashboard'))
+        ->assertInertia(fn ($page) => $page->component('auth/parent-pending'));
+});
+
 test('users are redirected to the dashboard for their active tenant role', function (
     string $role,
     string $dashboardRoute,

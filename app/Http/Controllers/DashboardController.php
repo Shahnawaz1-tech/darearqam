@@ -6,6 +6,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -14,11 +15,17 @@ class DashboardController extends Controller
     /**
      * Handle the incoming request.
      */
-    public function __invoke(TenantContext $tenantContext): RedirectResponse|Response
+    public function __invoke(Request $request, TenantContext $tenantContext): RedirectResponse|Response
     {
         $currentTenant = $tenantContext->current();
 
         if ($currentTenant === null) {
+            $user = $request->user();
+
+            if ($user instanceof User && $user->is_parent_account) {
+                return Inertia::render('auth/parent-pending');
+            }
+
             return $this->workspace(null);
         }
 

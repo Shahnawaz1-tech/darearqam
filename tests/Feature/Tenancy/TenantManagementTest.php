@@ -41,6 +41,17 @@ test('an authenticated user can create a tenant and becomes its owner', function
     $response->assertSessionHas('current_tenant_id', $tenant->id);
 });
 
+test('unlinked parent accounts cannot create a tenant', function () {
+    $parent = User::factory()->create(['is_parent_account' => true]);
+
+    $this->actingAs($parent)
+        ->post(route('tenants.store'), ['name' => 'Another Madrasa'])
+        ->assertForbidden();
+
+    $this->assertDatabaseMissing('tenants', ['name' => 'Another Madrasa']);
+    expect($parent->tenants()->exists())->toBeFalse();
+});
+
 test('staff and students cannot create a tenant to gain owner access', function (string $role) {
     $user = User::factory()->create();
     $tenant = createTenantWithOwner(User::factory()->create(), 'Existing Madrasa');
@@ -161,6 +172,30 @@ test('owners can assign staff student and parent roles', function (string $role)
     'student' => Tenant::ROLE_STUDENT,
     'parent' => Tenant::ROLE_PARENT,
 ]);
+
+test('owners can link registered parent accounts to a tenant', function () {
+    $owner = User::factory()->create();
+    $parent = User::factory()->create(['is_parent_account' => true]);
+    $tenant = createTenantWithOwner($owner, 'Dar e Arqam');
+
+    $this->actingAs($owner)
+        ->post(route('tenants.members.store', $tenant), [
+            'email' => $parent->email,
+            'role' => Tenant::ROLE_PARENT,
+        ])
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertDatabaseHas('tenant_user', [
+        'tenant_id' => $tenant->id,
+        'user_id' => $parent->id,
+        'role' => Tenant::ROLE_PARENT,
+    ]);
+
+    $this->actingAs($parent)
+        ->withSession(['current_tenant_id' => $tenant->id])
+        ->get(route('dashboard'))
+        ->assertRedirect(route('parent.dashboard'));
+});
 
 test('a tenant owner cannot add an account that does not exist', function () {
     $owner = User::factory()->create();

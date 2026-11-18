@@ -27,6 +27,8 @@ class TenantController extends Controller
         );
 
         $user = $this->authenticatedUser($request);
+        abort_if($user->is_parent_account, 403);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
         ]);
