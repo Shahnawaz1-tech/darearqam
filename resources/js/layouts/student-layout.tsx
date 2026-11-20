@@ -7,6 +7,16 @@ import {
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { COPY, type StudentCopy } from '@/components/student/copy';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { logout } from '@/routes';
+import { profile as studentProfile } from '@/routes/student';
 
 type Lang = 'ur' | 'en';
 type ShellContextValue = { lang: Lang; t: StudentCopy; search: string; setSearch: (value: string) => void };
@@ -28,9 +38,11 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
     const [lang, setLang] = useState<Lang>('ur');
     const [search, setSearch] = useState('');
     const [mobileOpen, setMobileOpen] = useState(false);
-    const { auth } = usePage<{ auth: { user: { name: string; email: string; avatar?: string } | null } }>().props;
+    const page = usePage<{ auth: { user: { name: string; email: string; avatar?: string } | null } }>();
+    const { auth } = page.props;
     const pageProps = usePage().props as { kpis?: { dueHomework?: number }; messages?: unknown[] };
     const t = COPY[lang];
+    const isProfilePage = page.url.startsWith('/student/profile');
 
     useEffect(() => {
         try {
@@ -58,21 +70,21 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
                         <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.14em] text-slate-400">{t[group.label]}</p>
                         <div className="space-y-1">
                             {group.items.map(([label, target, Icon]) => (
-                                <a key={target} href={`#${target}`} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${target === 'dashboard' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-slate-600 hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]'}`}>
+                                <Link key={target} href={target === 'profile' ? studentProfile() : `#${target}`} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${(target === 'dashboard' && !isProfilePage) || (target === 'profile' && isProfilePage) ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-slate-600 hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]'}`}>
                                     <Icon className="size-[18px] shrink-0" aria-hidden="true" /><span>{t[label]}</span>
                                     {target === 'homework' && (pageProps.kpis?.dueHomework ?? 0) > 0 && <span className="ms-auto rounded-full bg-rose-100 px-2 py-0.5 text-[10px] text-rose-700">{pageProps.kpis?.dueHomework}</span>}
-                                </a>
+                                </Link>
                             ))}
                         </div>
                     </div>
                 ))}
             </nav>
             <div className="grid grid-cols-5 gap-1 border-t border-[var(--student-border)] p-3" aria-label={t.quickActions}>
-                {[[UserRound, '/settings/profile', t.profile], [Settings, '/settings/appearance', t.profile], [FileText, '/student/id-card', t.idCard], [HelpCircle, '#discussions', t.contactTeacher]].map(([Icon, href, label], i) => {
+                {[[UserRound, studentProfile.url(), t.profileSettings], [Settings, '/settings/appearance', t.profile], [FileText, '/student/id-card', t.idCard], [HelpCircle, '#discussions', t.contactTeacher]].map(([Icon, href, label], i) => {
                     const Symbol = Icon as typeof UserRound;
-                    return <a key={i} href={href as string} aria-label={label as string} title={label as string} className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-[var(--brand)] hover:text-[var(--brand)]"><Symbol className="size-4" /></a>;
+                    return <Link key={i} href={href as string} aria-label={label as string} title={label as string} className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-[var(--brand)] hover:text-[var(--brand)]"><Symbol className="size-4" /></Link>;
                 })}
-                <Link href="/logout" method="post" as="button" aria-label={t.logout} title={t.logout} className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-rose-400 hover:text-rose-600"><LogOut className="size-4" /></Link>
+                <Link href={logout()} method="post" as="button" aria-label={t.logout} title={t.logout} className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-rose-400 hover:text-rose-600"><LogOut className="size-4" /></Link>
             </div>
         </aside>
     );
@@ -95,12 +107,31 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
                     <a href="#notices" aria-label={t.notifications} className="relative hidden size-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 sm:flex"><Bell className="size-4" /><span className="absolute -end-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--warn)] text-[9px] font-bold text-slate-900">{pageProps.kpis?.dueHomework ?? 0}</span></a>
                     <a href="#discussions" aria-label={t.messages} className="hidden size-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 md:flex"><MessageCircle className="size-4" /></a>
                     <a href="#resources" aria-label={t.bookmarks} className="hidden size-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 md:flex"><BookOpen className="size-4" /></a>
-                    <Link href="/settings/profile" aria-label={t.profile} className="flex size-9 items-center justify-center overflow-hidden rounded-full border-2 border-white/70 bg-white/20 text-sm font-bold">{auth.user?.avatar ? <img src={auth.user.avatar} alt="" className="size-full object-cover" /> : auth.user?.name?.charAt(0) ?? 'ط'}</Link>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button type="button" aria-label={t.profileSettings} className="flex size-9 items-center justify-center overflow-hidden rounded-full border-2 border-white/70 bg-white/20 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                                {auth.user?.avatar ? <img src={auth.user.avatar} alt="" className="size-full object-cover" /> : auth.user?.name?.charAt(0) ?? 'ط'}
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-52">
+                            <DropdownMenuLabel className="font-normal">
+                                <span className="block truncate text-sm font-semibold">{auth.user?.name}</span>
+                                <span className="block truncate text-xs text-muted-foreground">{auth.user?.email}</span>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                                <Link href={studentProfile()}><UserRound className="size-4" />{t.profileSettings}</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link href={logout()} method="post" as="button" className="w-full text-rose-700 focus:text-rose-700"><LogOut className="size-4" />{t.logout}</Link>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </header>
-                <div className="flex min-h-[calc(100vh-4rem)]">
-                    <div className="hidden lg:block">{sidebar}</div>
+                <div className="flex min-h-[calc(100vh-4rem)] min-w-0">
+                    <div className="hidden shrink-0 lg:block">{sidebar}</div>
                     {mobileOpen && <div className="fixed inset-0 z-50 flex lg:hidden"><button type="button" aria-label={t.close} onClick={() => setMobileOpen(false)} className="absolute inset-0 bg-slate-950/35" /><div className="relative z-10 h-full shadow-xl">{sidebar}</div></div>}
-                    <div className="min-w-0 flex-1">{children}</div>
+                    <div className="min-w-0 w-full flex-1">{children}</div>
                 </div>
             </div>
         </StudentShellContext.Provider>

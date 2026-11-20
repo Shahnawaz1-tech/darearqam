@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -25,9 +26,9 @@ class DashboardController extends Controller
         abort_unless($student !== null, 403);
 
         $props = Cache::remember(
-            "student-dashboard:{$tenant->id}:{$student->id}",
+            "student-dashboard:v2:{$tenant->id}:{$student->id}",
             now()->addSeconds(60),
-            fn (): array => $this->dashboardData($student, $tenant),
+            fn (): array => $this->normalizeDashboardPayload($this->dashboardData($student, $tenant)),
         );
 
         return Inertia::render('student/dashboard', $props);
@@ -222,6 +223,31 @@ class DashboardController extends Controller
     private function grade(float $percent): string
     {
         return match (true) { $percent >= 90 => 'A+', $percent >= 80 => 'A', $percent >= 70 => 'B', $percent >= 60 => 'C', default => 'D' };
+    }
+
+    /** @param array<string, mixed> $payload
+     *  @return array<string, mixed>
+     */
+    private function normalizeDashboardPayload(array $payload): array
+    {
+        foreach ($payload as $key => $value) {
+            $payload[$key] = $this->normalizeDashboardValue($value);
+        }
+
+        return $payload;
+    }
+
+    private function normalizeDashboardValue(mixed $value): mixed
+    {
+        if ($value instanceof Collection) {
+            return $value->map(fn (mixed $item): mixed => $this->normalizeDashboardValue($item))->all();
+        }
+
+        if (is_array($value)) {
+            return array_map(fn (mixed $item): mixed => $this->normalizeDashboardValue($item), $value);
+        }
+
+        return $value;
     }
 
     /** @return array{city:?string,hijri:?string,times:array<int,array{name:string,time:string}>} */

@@ -27,7 +27,7 @@ class StudentActionController extends Controller
 
     private function clearDashboard(Student $student): void
     {
-        Cache::forget("student-dashboard:{$student->tenant_id}:{$student->id}");
+        Cache::forget("student-dashboard:v2:{$student->tenant_id}:{$student->id}");
     }
 
     public function submitHomework(HomeworkSubmissionRequest $request, Homework $homework): RedirectResponse

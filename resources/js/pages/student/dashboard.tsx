@@ -49,8 +49,8 @@ export default function StudentDashboard(props: Props) {
 
     return <>
         <Head title={t.dashboardTitle} />
-        <main id="dashboard" className="min-w-0 bg-[var(--page)] p-3 sm:p-5 xl:p-6">
-            <div className="mx-auto flex max-w-[1680px] flex-col gap-4">
+        <main id="dashboard" className="w-full min-w-0 overflow-x-clip bg-[var(--page)] p-3 sm:p-5 xl:p-6">
+            <div className="mx-auto flex w-full max-w-[1680px] min-w-0 flex-col gap-4">
                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-3"><span className="flex size-11 items-center justify-center rounded-xl border border-[var(--student-border)] bg-white text-[var(--brand)]"><GraduationCap className="size-5" /></span><div><h1 className="text-xl font-bold text-slate-800 sm:text-2xl">{t.dashboardTitle}</h1><p className="text-xs text-slate-500">{t.breadcrumb} <DirectionIcon className="mx-1 inline size-3" /> {t.dashboardTitle}</p></div></div>
                     <div className="flex flex-wrap gap-2">{shortcutItems.map(([Icon, label, href], i) => <a key={href} href={href} title={label} aria-label={label} className="flex size-9 items-center justify-center rounded-full border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow" style={{ borderColor: ['var(--info)', 'var(--warn)', 'var(--ok)', 'var(--danger)', 'var(--brand)'][i], color: ['var(--info)', '#a56a00', 'var(--ok)', 'var(--danger)', 'var(--brand)'][i] }}><Icon className="size-4" /></a>)}</div>

@@ -10,6 +10,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ResultController;
 use App\Http\Controllers\RoleDashboardController;
+use App\Http\Controllers\Settings\ProfileController as SettingsProfileController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\Student\StudentActionController;
 use App\Http\Controllers\Student\StudentDocumentController;
@@ -71,6 +72,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('student/dashboard', StudentDashboardController::class)
         ->middleware(RequireTenantRole::class.':student')
         ->name('student.dashboard');
+    Route::inertia('student/profile', 'student/profile')
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.profile');
+    Route::patch('student/profile', [SettingsProfileController::class, 'updateFromStudent'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.profile.update');
     Route::post('student/homework/{homework}/submit', [StudentActionController::class, 'submitHomework'])
         ->middleware(RequireTenantRole::class.':student')
         ->name('student.homework.submit');
