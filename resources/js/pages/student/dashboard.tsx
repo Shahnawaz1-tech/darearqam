@@ -1,177 +1,109 @@
-import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { Head, usePage, usePoll } from '@inertiajs/react';
+import { ArrowLeft, ArrowRight, Bell, CalendarDays, FileText, GraduationCap, Wallet } from 'lucide-react';
+import { useStudentShell } from '@/layouts/student-layout';
 import {
-    Award, Bell, Bookmark, BookOpen, CalendarDays, ChevronRight, CircleHelp,
-    ClipboardCheck, Clock3, Download, GraduationCap, LayoutDashboard, Library,
-    Menu, MessageCircle, Settings, UserRound, Users, WalletCards, X,
-} from 'lucide-react';
-import { KpiCard } from '@/components/student/KpiCard';
-import { CourseCard } from '@/components/student/CourseCard';
-import { HoursChart } from '@/components/student/HoursChart';
-import type { Homework, Lang, StudentDashboardProps } from '@/types/student-dashboard';
+    AttendanceGauge, CourseGrid, Discussion, ExamResult, FeeWidget, HifzDiary, HomeworkList,
+    HoursChart, KpiCard, LeaveWidget, Notices, PrayerStrip, QuickActions, ResourceTiles,
+    SectionTitle, UpcomingClasses,
+} from '@/components/student/dashboard-widgets';
 
-const COPY = {
-    en: {
-        dashboard:'Dashboard', myClasses:'My Classes', timetable:'Timetable', homework:'Homework',
-        attendance:'Attendance', results:'Exams & Results', hifz:'Hifz Diary', fees:'Fees',
-        notices:'Notices', resources:'Resources', leave:'Leave Requests', profile:'Profile',
-        search:'Search homework, notices, resources', studentDashboard:'Student Dashboard',
-        average:'Result average', classesToday:'Today\'s classes', due:'Due homework',
-        points:'Achievement points', learningPath:'My Learning Path', continue:'Continue',
-        upcoming:'Upcoming Classes', studyHours:'Study / Attendance Hours', discussion:'Class Discussion',
-        overallAttendance:'Overall Attendance', quickActions:'Quick Actions', downloads:'Resources & Downloads',
-        submit:'Submit', leaveRequest:'Apply for Leave', reply:'Quick reply', viewAll:'View all',
-        empty:'No data available.', close:'Close', inRoom:'In room', join:'Join',
-        pending:'Pending', submitted:'Submitted', late:'Late', graded:'Graded',
-        viewTimetable:'View Timetable', viewResults:'View Results', feeStatus:'Fee Status',
-        applyLeave:'Apply for Leave', idCard:'Download ID Card', contact:'Contact Teacher',
-        feeWidget:'Fee Status', hifzDiary:'Hifz / Nazra Diary', latestResult:'Latest Result',
-    },
-    ur: {
-        dashboard:'ڈیش بورڈ', myClasses:'میری کلاسیں', timetable:'ویقت نامہ', homework:'گھر کا کام',
-        attendance:'حاضری', results:'امتحانات و نتائج', hifz:'حفظ ڈائری', fees:'فیس',
-        notices:'اطلاعات', resources:'وسائل', leave:'رخصت کی درخواست', profile:'پروفائل',
-        search:'گھر کا کام، اطلاعات اور وسائل تلاش کریں', studentDashboard:'طالب علم ڈیش بورڈ',
-        average:'نتیجہ اوسط', classesToday:'آج کی کلاسیں', due:'باقی گھر کا کام',
-        points:'کامیابی کے نمبر', learningPath:'میرا تعلیمی راستہ', continue:'جاری رکھیں',
-        upcoming:'آنے والی کلاسیں', studyHours:'مطالعہ / حاضری کے گھنٹے', discussion:'کلاس گفتگو',
-        overallAttendance:'کل حاضری', quickActions:'فوری اقدامات', downloads:'وسائل اور ڈاؤن لوڈ',
-        submit:'جمع کرائیں', leaveRequest:'رخصت درخواست', reply:'مختصر جواب', viewAll:'سب دیکھیں',
-        empty:'کوئی معلومات دستیاب نہیں۔', close:'بند کریں', inRoom:'کمرہ', join:'شامل ہوں',
-        pending:'زیر التوا', submitted:'جمع شدہ', late:'تاخیری', graded:'نشان زد',
-        viewTimetable:'ویقت نامہ دیکھیں', viewResults:'نتائج دیکھیں', feeStatus:'فیس کی صورتحال',
-        applyLeave:'رخصت درخواست', idCard:'شناختی کارڈ ڈاؤن لوڈ', contact:'استاد سے رابطہ',
-        feeWidget:'فیس کی صورتحال', hifzDiary:'حفظ / ناظرہ ڈائری', latestResult:'آخری نتیجہ',
-    },
-} as const;
+type Props = Record<string, unknown> & {
+    student: { id: number; name: string; class: string; roll: string; photo: string | null };
+    kpis: { student: string; class: string; roll: string; average: number; grade: string; trend: number; todayClasses: number; nextClassMinutes: number | null; dueHomework: number; overdueHomework: number; points: number; rank: number | null };
+    courses: { id: number; title: string; teacher: string; progress: number; tags: string[]; cover: string | null }[];
+    upcoming: { id: number; subject: string; topic: string; teacher: string; startsAt: string; endsAt: string; room: string; liveUrl: string | null; isPast: boolean; minutesUntil: number }[];
+    homework: { id: number; title: string; description: string; course: string; dueAt: string | null; status: string; attachment: string | null; submissionText: string | null; submissionFile: string | null; feedback: string | null; marks: number | null }[];
+    studyHours: { thisWeek: number; lastWeek: number; days: { label: string; date: string; hours: number; lastWeekHours: number }[] };
+    attendance: { percent: number; present: number; absent: number; total: number; trend: string };
+    threads: { id: number; title: string; tag: string; author: string; createdAt: string; messages: { id: number; author: string; body: string; tag: string; createdAt: string }[] }[];
+    messages: Props['threads'];
+    fees: { month: string; amount: number; paid: number; balance: number; dueDate: string | null; overdue: boolean; history: { id: number; title: string; amount: number; paid: number; dueDate: string | null; status: string }[] };
+    latestResult: { exam: string; date: string | null; marks: number; total: number; percent: number; grade: string; examId: number; subjects: { name: string; marks: number; total: number }[] } | null;
+    upcomingExams: { id: number; title: string; date: string | null; subject: string | null; time: string | null; hall: string | null }[];
+    hifz: { parasDone: number; today: { id: number; date: string; type: string; from: string; to: string; rating: string | null; remarks: string | null; teacher: string }[]; recent: Props['hifz']['today'] };
+    remarks: { id: number; category: string; body: string; date: string; teacher: string }[];
+    leave: { id: number; fromDate: string; toDate: string; reason: string; status: string }[];
+    points: { total: number; rank: number | null; badges: { id: number; title: string; points: number; date: string }[] };
+    notices: { id: number; title: string; body: string; type: string; date: string | null; isNew: boolean }[];
+    resources: { id: number; category: string; title: string; url: string }[];
+    prayer: { city: string | null; hijri: string | null; times: { name: string; time: string }[] };
+    flash?: { student_success?: string };
+};
 
-const navItems = [
-    ['dashboard', LayoutDashboard], ['myClasses', Users], ['timetable', CalendarDays],
-    ['homework', ClipboardCheck], ['attendance', Clock3], ['results', GraduationCap],
-    ['hifz', BookOpen], ['fees', WalletCards], ['notices', Bell], ['resources', Library],
-    ['leave', CircleHelp], ['profile', UserRound],
-] as const;
+export default function StudentDashboard(props: Props) {
+    const { t, search, lang } = useStudentShell();
+    const page = usePage<Props>();
+    usePoll(60000, { only: ['kpis', 'upcoming', 'homework', 'notices', 'messages'] }, { keepAlive: false });
 
-export default function StudentDashboard(props: StudentDashboardProps) {
-    const { auth, tenancy } = usePage().props;
-    const [lang,setLang] = useState<Lang>(() => (typeof localStorage !== 'undefined' && localStorage.getItem('lang') === 'ur') ? 'ur' : 'en');
-    const [sidebarOpen,setSidebarOpen] = useState(true);
-    const [query,setQuery] = useState('');
-    const [selectedHomework,setSelectedHomework] = useState<Homework|null>(null);
-    const [text,setText] = useState('');
-    const [leaveOpen,setLeaveOpen] = useState(false);
-    const [leaveReason,setLeaveReason] = useState('');
-    const [leaveFrom,setLeaveFrom] = useState('');
-    const [leaveTo,setLeaveTo] = useState('');
-    const copy=COPY[lang];
+    const query = search.trim().toLocaleLowerCase();
+    const matches = (values: (string | null | undefined)[]) => !query || values.some((value) => value?.toLocaleLowerCase().includes(query));
+    const courses = props.courses.filter((item) => matches([item.title, item.teacher, ...item.tags]));
+    const homework = props.homework.filter((item) => matches([item.title, item.description, item.course, item.status]));
+    const notices = props.notices.filter((item) => matches([item.title, item.body, item.type]));
+    const resources = props.resources.filter((item) => matches([item.title, item.category]));
+    const threads = page.props.messages ?? props.threads;
+    const nextClassText = props.kpis.nextClassMinutes === null ? '—' : props.kpis.nextClassMinutes <= 0 ? t.past : `${props.kpis.nextClassMinutes} min`;
+    const trendText = `${props.kpis.trend >= 0 ? '+' : ''}${props.kpis.trend}% ${t.trend}`;
+    const shortcutItems = [[CalendarDays, t.timetableNav, '#timetable'], [FileText, t.homeworkNav, '#homework'], [GraduationCap, t.examsNav, '#results'], [Wallet, t.feesNav, '#fees'], [Bell, t.noticesNav, '#notices']] as const;
+    const DirectionIcon = lang === 'ur' ? ArrowLeft : ArrowRight;
 
-    useEffect(() => {
-        document.documentElement.lang=lang;
-        document.documentElement.dir=lang==='ur'?'rtl':'ltr';
-        localStorage.setItem('lang',lang);
-    },[lang]);
+    return <>
+        <Head title={t.dashboardTitle} />
+        <main id="dashboard" className="min-w-0 bg-[var(--page)] p-3 sm:p-5 xl:p-6">
+            <div className="mx-auto flex max-w-[1680px] flex-col gap-4">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                    <div className="flex items-center gap-3"><span className="flex size-11 items-center justify-center rounded-xl border border-[var(--student-border)] bg-white text-[var(--brand)]"><GraduationCap className="size-5" /></span><div><h1 className="text-xl font-bold text-slate-800 sm:text-2xl">{t.dashboardTitle}</h1><p className="text-xs text-slate-500">{t.breadcrumb} <DirectionIcon className="mx-1 inline size-3" /> {t.dashboardTitle}</p></div></div>
+                    <div className="flex flex-wrap gap-2">{shortcutItems.map(([Icon, label, href], i) => <a key={href} href={href} title={label} aria-label={label} className="flex size-9 items-center justify-center rounded-full border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow" style={{ borderColor: ['var(--info)', 'var(--warn)', 'var(--ok)', 'var(--danger)', 'var(--brand)'][i], color: ['var(--info)', '#a56a00', 'var(--ok)', 'var(--danger)', 'var(--brand)'][i] }}><Icon className="size-4" /></a>)}</div>
+                </div>
 
-    usePoll(60000,{only:['kpis','upcoming','homework','notices','messages']},{keepAlive:false});
+                <PrayerStrip prayer={props.prayer} t={t} />
 
-    const filteredResources=useMemo(()=>{
-        const needle=query.toLowerCase().trim();
-        if(!needle)return props.resources;
-        return props.resources.filter(r=>`${r.title} ${r.category}`.toLowerCase().includes(needle));
-    },[props.resources,query]);
+                {props.flash?.student_success && <p role="status" aria-live="polite" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{props.flash.student_success}</p>}
 
-    const submitHomework=(event:React.FormEvent<HTMLFormElement>)=>{
-        event.preventDefault();
-        if(!selectedHomework)return;
-        router.post(`/student/homework/${selectedHomework.id}/submit`,{text},{preserveScroll:true,onSuccess:()=>setSelectedHomework(null)});
-    };
+                <section aria-labelledby="student-kpis-title"><h2 id="student-kpis-title" className="sr-only">{t.today}</h2><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <KpiCard label={t.gpa} value={`${props.kpis.average}% · ${props.kpis.grade}`} detail={t.average} trend={trendText} Icon={GraduationCap} tone="brand" />
+                    <KpiCard label={t.classesToday} value={props.kpis.todayClasses} detail={`${t.nextClass}: ${nextClassText}`} Icon={CalendarDays} tone="ok" />
+                    <KpiCard label={t.dueHomework} value={props.kpis.dueHomework} detail={`${t.overdue}: ${props.kpis.overdueHomework}`} Icon={FileText} tone="warn" />
+                    <KpiCard label={t.points} value={props.kpis.points.toLocaleString()} detail={`${t.classRank}: ${props.kpis.rank ?? '—'}`} Icon={GraduationCap} tone="info" />
+                </div></section>
 
-    return (
-        <>
-            <Head title={copy.studentDashboard}/>
-            <div className={lang==='ur'?'font-[\'Noto_Nastaliq_Urdu\',serif]':'font-[Inter,sans-serif]'}>
-                <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center gap-3 bg-[var(--brand)] px-3 text-white sm:px-5">
-                    <button onClick={()=>setSidebarOpen(v=>!v)} className="rounded-lg p-2 hover:bg-white/10" aria-label="Toggle navigation"><Menu className="size-5"/></button>
-                    <img src="/madrasa-logo.png" alt="" className="size-9 rounded-full bg-white object-contain"/>
-                    <div className="hidden min-w-44 lg:block"><p className="text-sm font-bold">{tenancy.current?.name ?? 'Dar-e-Arqam'}</p></div>
-                    <label className="mx-auto flex w-full max-w-md items-center rounded-full bg-white px-3 text-slate-500">
-                        <span className="sr-only">{copy.search}</span>
-                        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder={copy.search} className="h-9 w-full bg-transparent text-xs outline-none"/>
-                    </label>
-                    <button className="relative rounded-full p-2 hover:bg-white/10" title="Notifications"><Bell className="size-5"/><span className="absolute end-0 top-0 size-2 rounded-full bg-[var(--danger)]"/></button>
-                    <button className="relative hidden rounded-full p-2 hover:bg-white/10 sm:block" title="Messages"><MessageCircle className="size-5"/></button>
-                    <button onClick={()=>setLang(lang==='en'?'ur':'en')} className="rounded-full border border-white/30 px-2.5 py-1 text-xs font-bold">{lang==='en'?'UR':'EN'}</button>
-                    <div className="flex size-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[var(--brand)]">{auth.user?.name?.[0] ?? 'S'}</div>
-                </header>
+                <section id="courses" className={panel}><SectionTitle>{t.learningPath}</SectionTitle><CourseGrid items={courses} t={t} /></section>
 
-                <aside className={`fixed bottom-0 top-16 z-30 w-60 border-e border-[var(--card-border)] bg-white transition-transform ${sidebarOpen?'translate-x-0':'-translate-x-full'}`}>
-                    <nav className="h-full overflow-y-auto px-3 py-4" aria-label="Student navigation">
-                        <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Dashboard</p>
-                        <div className="mt-2 space-y-1">{navItems.slice(0,1).map(([key,Icon])=><button key={key} className="flex w-full items-center gap-3 rounded-lg bg-[var(--brand)] px-3 py-2.5 text-sm font-semibold text-white"><Icon className="size-4"/>{copy[key]}</button>)}</div>
-                        <p className="mt-5 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Academics</p>
-                        <div className="mt-2 space-y-1">{navItems.slice(1,10).map(([key,Icon])=><button key={key} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]"><Icon className="size-4"/>{copy[key]}</button>)}</div>
-                        <p className="mt-5 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Account</p>
-                        <div className="mt-2">{navItems.slice(10).map(([key,Icon])=><button key={key} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-600"><Icon className="size-4"/>{copy[key]}</button>)}</div>
-                    </nav>
-                </aside>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <section id="timetable" className={panel}><SectionTitle>{t.upcomingClasses}</SectionTitle><UpcomingClasses items={props.upcoming} t={t} /></section>
+                    <section id="homework" className={panel}><SectionTitle>{t.assignments}</SectionTitle><HomeworkList items={homework} t={t} /></section>
+                    <section className={panel}><SectionTitle>{t.hours}</SectionTitle><HoursChart data={props.studyHours.days} thisWeek={props.studyHours.thisWeek} lastWeek={props.studyHours.lastWeek} t={t} /></section>
+                </div>
 
-                <main className={`min-h-screen bg-[var(--page)] pt-16 transition-[padding] ${sidebarOpen?'lg:ps-60':''}`}>
-                    <div className="mx-auto max-w-[1600px] p-3 sm:p-5">
-                        <section className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-                            <div><p className="text-xs text-slate-400">Home / <span className="text-[var(--brand)]">{copy.dashboard}</span></p><h1 className="mt-1 text-xl font-bold text-slate-900">{copy.studentDashboard}</h1></div>
-                            <div className="flex items-center gap-2" aria-label="Prayer and Hijri date"><span className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm">{props.prayer.hijri}</span>{props.prayer.times.map(t=><span key={t.name} className="hidden rounded-full bg-white px-2 py-1 text-[10px] text-slate-500 xl:inline">{t.name} {t.time}</span>)}</div>
-                        </section>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <section id="discussions" className={panel}><SectionTitle action={<a href="#discussions" className="text-xs font-semibold text-[var(--brand)]">{t.viewAll}</a>}>{t.discussions}</SectionTitle><Discussion items={threads} t={t} /></section>
+                    <section id="attendance" className={panel}><SectionTitle>{t.attendance}</SectionTitle><AttendanceGauge value={props.attendance.percent} present={props.attendance.present} absent={props.attendance.absent} total={props.attendance.total} trend={props.attendance.trend} t={t} /></section>
+                    <section className={panel}><SectionTitle>{t.quickActions}</SectionTitle><QuickActions t={t} /></section>
+                </div>
 
-                        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <KpiCard icon={Award} label={copy.average} value={`${props.kpis.average}% · ${props.kpis.grade}`} detail={props.kpis.averageTrend ?? 'Academic progress'} color="var(--ok)"/>
-                            <KpiCard icon={Clock3} label={copy.classesToday} value={props.kpis.todayClasses} detail={props.kpis.nextClassMinutes?`Next class in ${props.kpis.nextClassMinutes} min`:'No upcoming class'} color="var(--brand)"/>
-                            <KpiCard icon={ClipboardCheck} label={copy.due} value={props.kpis.dueHomework} detail={`${props.kpis.overdueHomework} overdue`} color="var(--warn)"/>
-                            <KpiCard icon={Award} label={copy.points} value={props.kpis.points} detail={props.kpis.rank?`Rank ${props.kpis.rank}`:'Class progress'} color="var(--info)"/>
-                        </section>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <section id="results" className={panel}><SectionTitle>{t.results}</SectionTitle><ExamResult result={props.latestResult} exams={props.upcomingExams} t={t} /></section>
+                    <section id="fees" className={panel}><SectionTitle>{t.fees}</SectionTitle><FeeWidget fees={props.fees} t={t} /></section>
+                    <section id="hifz" className={panel}><SectionTitle>{t.hifz}</SectionTitle><HifzDiary hifz={props.hifz} t={t} /></section>
+                </div>
 
-                        <section className="mt-5 rounded-xl border border-[var(--card-border)] bg-white p-4 shadow-[var(--subtle-shadow)]">
-                            <h2 className="mb-3 text-sm font-bold text-slate-900">{copy.learningPath}</h2>
-                            {props.courses.length?<div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">{props.courses.map(course=><CourseCard key={course.id} course={course} continueText={copy.continue}/>)}</div>:<p className="py-8 text-center text-sm text-slate-400">{copy.empty}</p>}
-                        </section>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <section className={panel}><SectionTitle>{t.teacherRemarks}</SectionTitle>{props.remarks.length ? <ul className="space-y-3">{props.remarks.map((remark) => <li key={remark.id} className="border-s-2 border-[var(--brand)] ps-3"><div className="flex justify-between gap-2"><strong className="text-xs">{remark.category}</strong><span className="text-[10px] text-slate-400">{new Date(remark.date).toLocaleDateString(lang === 'ur' ? 'ur-PK' : 'en-PK')}</span></div><p className="mt-1 text-xs text-slate-600">{remark.body}</p><p className="text-[10px] text-slate-400">{t.teacher}: {remark.teacher}</p></li>)}</ul> : <p className="py-5 text-center text-sm text-slate-500">{t.noRemarks}</p>}</section>
+                    <section id="leave" className={panel}><SectionTitle>{t.leaveRequests}</SectionTitle><LeaveWidget items={props.leave} t={t} /></section>
+                    <section id="notices" className={panel}><SectionTitle>{t.notices}</SectionTitle><Notices items={notices} t={t} /></section>
+                </div>
 
-                        <div className="mt-5 grid gap-4 xl:grid-cols-3">
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4">
-                                <h2 className="text-sm font-bold">{copy.upcoming}</h2>
-                                <div className="mt-3 space-y-2">{props.upcoming.length?props.upcoming.map(slot=><article key={slot.id} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3"><span className="flex size-9 items-center justify-center rounded-lg bg-[var(--brand-soft)] text-[var(--brand)]"><BookOpen className="size-4"/></span><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{slot.subject}</p><p className="text-[10px] text-slate-500">{slot.topic} · {slot.teacher}</p><p className="mt-1 text-[10px] text-slate-400">{slot.time}</p></div>{slot.liveUrl?<a href={slot.liveUrl} target="_blank" className="rounded-md border border-[var(--brand)] px-2 py-1 text-[10px] text-[var(--brand)]">{copy.join}</a>:<span className="text-[10px] text-slate-400">{copy.inRoom} {slot.room}</span>}</article>):<p className="py-8 text-center text-xs text-slate-400">{copy.empty}</p>}</div>
-                            </section>
+                <section id="resources" className={panel}><SectionTitle>{t.resources}</SectionTitle>{resources.length ? <ResourceTiles items={resources} t={t} /> : <p className="py-6 text-center text-sm text-slate-500">{t.noResources}</p>}</section>
 
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4">
-                                <h2 className="text-sm font-bold">{copy.homework}</h2>
-                                <div className="mt-3 space-y-2">{props.homework.length?props.homework.slice(0,6).map(item=><button key={item.id} onClick={()=>setSelectedHomework(item)} className="flex w-full items-start gap-2 rounded-lg p-2 text-start hover:bg-slate-50"><span className={`mt-0.5 size-4 shrink-0 rounded border ${item.submitted?'bg-[var(--ok)] border-[var(--ok)]':''}`}/><span className="min-w-0 flex-1"><span className={`block text-xs font-semibold ${item.submitted?'line-through text-slate-400':'text-slate-800'}`}>{item.title}</span><span className="text-[10px] text-slate-400">{new Date(item.dueAt).toLocaleString()}</span></span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px]">{copy[item.status]}</span></button>):<p className="py-8 text-center text-xs text-slate-400">{copy.empty}</p>}</div>
-                            </section>
+                <section className="grid gap-4 sm:grid-cols-2">
+                    <div className={panel}><SectionTitle>{t.points}</SectionTitle><p className="text-3xl font-bold text-[var(--brand)]" dir="ltr">{props.points.total.toLocaleString()}</p><p className="text-xs text-slate-500">{t.classRank}: {props.points.rank ?? '—'}</p><ul className="mt-3 flex flex-wrap gap-2">{props.points.badges.map((badge) => <li key={badge.id} className="rounded-full bg-[var(--brand-soft)] px-3 py-1 text-[10px] text-[var(--brand)]">{badge.title} +{badge.points}</li>)}</ul></div>
+                    <div className={panel}><SectionTitle>{t.exams}</SectionTitle>{props.upcomingExams.length ? <div className="grid gap-2 sm:grid-cols-2">{props.upcomingExams.slice(0, 4).map((exam) => <div key={`exam-${exam.id}-${exam.subject}`} className="rounded-lg border border-slate-100 p-3"><p className="text-xs font-semibold">{exam.subject || exam.title}</p><p className="mt-1 text-[10px] text-slate-500">{exam.date ? new Date(exam.date).toLocaleDateString(lang === 'ur' ? 'ur-PK' : 'en-PK') : '—'} {exam.time ?? ''}</p></div>)}</div> : <p className="py-4 text-center text-sm text-slate-500">{t.noExams}</p>}</div>
+                </section>
 
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4"><h2 className="text-sm font-bold">{copy.studyHours}</h2><HoursChart data={props.studyHours}/></section>
-                        </div>
-
-                        <div className="mt-5 grid gap-4 xl:grid-cols-3">
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4"><div className="flex items-center justify-between"><h2 className="text-sm font-bold">{copy.discussion}</h2><button className="text-xs text-[var(--brand)]">{copy.viewAll}</button></div><div className="mt-3 space-y-3">{props.threads.length?props.threads.map(thread=><article key={thread.id} className="flex gap-2"><div className="flex size-8 items-center justify-center rounded-full bg-slate-100 text-xs">{thread.author[0]}</div><div className="min-w-0 flex-1"><p className="text-xs font-semibold">{thread.author} <span className="font-normal text-slate-400">{thread.relativeTime}</span></p><p className="truncate text-[11px] text-slate-600">{thread.message}</p><span className="mt-1 inline-block rounded-full bg-sky-50 px-2 py-0.5 text-[9px] text-sky-700">{thread.tag}</span></div></article>):<p className="py-6 text-xs text-slate-400">{copy.empty}</p>}</div><form onSubmit={e=>e.preventDefault()} className="mt-3 flex gap-2"><input placeholder={copy.reply} className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-xs"/><button className="rounded-lg bg-[var(--brand)] px-3 text-xs text-white">Send</button></form></section>
-
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4"><h2 className="text-sm font-bold">{copy.overallAttendance}</h2><div className="mt-4 flex justify-center"><div className="relative flex size-36 items-center justify-center rounded-full" style={{background:`conic-gradient(var(--info) ${props.attendance.percent}%, #e2e8f0 0)`}}><div className="flex size-28 items-center justify-center rounded-full bg-white text-2xl font-bold">{props.attendance.percent}%</div></div></div><div className="mt-4 grid grid-cols-3 gap-2 text-center">{[['Present',props.attendance.present],['Absent',props.attendance.absent],['Total',props.attendance.total]].map(([label,value])=><div key={String(label)} className="rounded-lg bg-slate-50 p-2"><p className="text-xs font-bold">{value}</p><p className="text-[9px] text-slate-400">{label}</p></div>)}</div></section>
-
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4"><h2 className="text-sm font-bold">{copy.quickActions}</h2><div className="mt-3 grid grid-cols-2 gap-2">
-                                {[['calendar',copy.viewTimetable],['result',copy.viewResults],['fee',copy.feeStatus],['leave',copy.applyLeave],['id',copy.idCard],['teacher',copy.contact]].map(([key,label])=><button key={key} onClick={()=>key==='leave'?setLeaveOpen(true):key==='id'?window.open('/student/id-card','_blank'):undefined} className="rounded-lg border border-slate-100 p-3 text-start"><LayoutDashboard className="size-4 text-[var(--brand)]"/><p className="mt-2 text-xs font-semibold">{label}</p></button>)}
-                            </div></section>
-                        </div>
-
-                        <section className="mt-5 rounded-xl border border-[var(--card-border)] bg-white p-4"><div className="flex items-center justify-between"><h2 className="text-sm font-bold">{copy.downloads}</h2></div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">{filteredResources.length?filteredResources.map(resource=><a key={resource.id} href={`/storage/${resource.file}`} className="rounded-lg border border-slate-100 p-3 text-center hover:border-[var(--brand)]"><Download className="mx-auto size-5 text-[var(--brand)]"/><p className="mt-2 text-xs font-semibold">{resource.title}</p></a>):['Notes','Books','Shared Files','Past Papers','Audio Lessons','Forms'].map(title=><div key={title} className="rounded-lg border border-slate-100 p-3 text-center"><Download className="mx-auto size-5 text-slate-300"/><p className="mt-2 text-xs text-slate-400">{title}</p></div>)}</div></section>
-
-                        <div className="mt-5 grid gap-4 xl:grid-cols-3">
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4"><h2 className="text-sm font-bold">{copy.hifzDiary}</h2><div className="mt-3"><div className="flex items-center gap-3"><div className="flex size-16 items-center justify-center rounded-full border-8 border-[var(--ok)] text-sm font-bold">{props.hifz.parasDone}</div><p className="text-xs text-slate-500">Paras recorded</p></div>{props.hifz.today.map((entry,i)=><div key={i} className="mt-2 rounded-lg bg-slate-50 p-2 text-xs"><b>{entry.type}</b> · {entry.from} - {entry.to}<span className="ms-2 text-[var(--ok)]">{entry.rating}</span></div>)}</div></section>
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4"><h2 className="text-sm font-bold">{copy.feeWidget}</h2><div className="mt-3 rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">{props.fees.month}</p><p className="mt-1 text-xl font-bold">{props.fees.balance} balance</p><p className="text-xs text-slate-500">Paid {props.fees.paid} / {props.fees.amount}</p>{props.fees.overdue?<span className="mt-2 inline-block rounded-full bg-red-50 px-2 py-1 text-[10px] text-[var(--danger)]">Overdue</span>:null}</div></section>
-                            <section className="rounded-xl border border-[var(--card-border)] bg-white p-4"><h2 className="text-sm font-bold">{copy.latestResult}</h2>{props.latestResult?<div className="mt-3"><p className="text-sm font-semibold">{props.latestResult.title}</p><p className="mt-1 text-2xl font-bold text-[var(--brand)]">{props.latestResult.percentage}% · {props.latestResult.grade}</p><div className="mt-2 space-y-1">{props.latestResult.subjects.map(s=><p key={s.name} className="flex justify-between text-xs"><span>{s.name}</span><b>{s.marks}/{s.total}</b></p>)}</div></div>:<p className="py-8 text-xs text-slate-400">{copy.empty}</p>}</section>
-                        </div>
-
-                        <footer className="mt-5 border-t border-[var(--card-border)] py-4 text-center text-xs text-slate-400">Madrasa Dar-e-Arqam · {new Date().getFullYear()}</footer>
-                    </div>
-                </main>
-
-                {selectedHomework&&<div className="fixed inset-0 z-50 bg-slate-950/30" role="dialog" aria-modal="true" aria-label={selectedHomework.title}><aside className="absolute end-0 top-0 h-full w-full max-w-md overflow-y-auto bg-white p-5 shadow-xl"><div className="flex items-center justify-between"><h2 className="font-bold">{selectedHomework.title}</h2><button onClick={()=>setSelectedHomework(null)} aria-label={copy.close}><X className="size-5"/></button></div><p className="mt-3 text-sm text-slate-600">{selectedHomework.description}</p><form onSubmit={submitHomework} className="mt-5"><label className="text-xs font-semibold">Text submission<textarea value={text} onChange={e=>setText(e.target.value)} className="mt-2 min-h-28 w-full rounded-lg border border-slate-200 p-3 text-sm"/></label><button className="mt-3 rounded-lg bg-[var(--brand)] px-4 py-2 text-sm text-white">{copy.submit}</button></form></aside></div>}
-                {leaveOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4"><form onSubmit={e=>{e.preventDefault();router.post('/student/leave-requests',{from:leaveFrom,to:leaveTo,reason:leaveReason},{onSuccess:()=>setLeaveOpen(false)})}} className="w-full max-w-md rounded-xl bg-white p-5"><div className="flex items-center justify-between"><h2 className="font-bold">{copy.leaveRequest}</h2><button type="button" onClick={()=>setLeaveOpen(false)}><X className="size-5"/></button></div><div className="mt-4 grid grid-cols-2 gap-3"><input type="date" value={leaveFrom} onChange={e=>setLeaveFrom(e.target.value)} className="rounded-lg border p-2 text-sm" required/><input type="date" value={leaveTo} onChange={e=>setLeaveTo(e.target.value)} className="rounded-lg border p-2 text-sm" required/></div><textarea value={leaveReason} onChange={e=>setLeaveReason(e.target.value)} className="mt-3 min-h-24 w-full rounded-lg border p-3 text-sm" required/><button className="mt-3 rounded-lg bg-[var(--brand)] px-4 py-2 text-sm text-white">{copy.submit}</button></form></div>}
+                <footer className="flex flex-col justify-between gap-1 border-t border-[var(--student-border)] px-1 py-4 text-[11px] text-slate-500 sm:flex-row"><span>{t.footer}</span><span>© {new Date().getFullYear()} · {t.year}</span><a href="/" className="font-medium text-[var(--brand)]">{t.footer}</a></footer>
             </div>
-        </>
-    );
+        </main>
+    </>;
 }
+
+const panel = 'rounded-xl border border-[var(--student-border)] bg-[var(--student-card)] p-4 shadow-[var(--student-shadow)] sm:p-5';

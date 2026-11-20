@@ -63,12 +63,13 @@ class DashboardController extends Controller
             ->orderBy('s.starts_at')->limit(10)->get()->map(function ($slot) use ($today): array {
                 $start = CarbonImmutable::parse($today->toDateString().' '.$slot->starts_at, $today->timezone);
                 $end = CarbonImmutable::parse($today->toDateString().' '.$slot->ends_at, $today->timezone);
+                $now = CarbonImmutable::now($today->timezone);
                 return [
                     'id' => (int) $slot->id, 'subject' => $slot->subject ?? '', 'topic' => '',
                     'teacher' => $slot->teacher ?? '', 'startsAt' => $start->toIso8601String(),
                     'endsAt' => $end->toIso8601String(), 'room' => $slot->room ?? '',
-                    'liveUrl' => $slot->live_url, 'isPast' => $end->lessThan($today->now()),
-                    'minutesUntil' => max(0, (int) $today->now()->diffInMinutes($start, false)),
+                    'liveUrl' => $slot->live_url, 'isPast' => $end->lessThan($now),
+                    'minutesUntil' => max(0, (int) $now->diffInMinutes($start, false)),
                 ];
             })->values() : collect();
 
@@ -94,23 +95,25 @@ class DashboardController extends Controller
         $attendanceTotal = $present + $absent + (int) $attendanceRows->where('status', 'excused')->sum('total');
         $attendanceByDay = $attendanceRows->groupBy('day');
         $slotsByDay = DB::table('timetable_slots')->where('tenant_id', $tenantId)->when($classId, fn ($q) => $q->where('class_id', $classId))->get(['weekday', 'starts_at', 'ends_at'])->groupBy('weekday');
-        $attendanceSlots = DB::table('attendances')->where('tenant_id', $tenantId)->where('student_id', $studentId)
-            ->whereIn('status', ['present', 'late'])->pluck('date')->map(fn ($date) => CarbonImmutable::parse($date)->dayOfWeek)->countBy();
+        $attendedByDate = DB::table('attendances')->where('tenant_id', $tenantId)->where('student_id', $studentId)
+            ->whereIn('status', ['present', 'late'])->whereBetween('date', [$lastWeekStart->toDateString(), $weekEnd->toDateString()])
+            ->selectRaw('DATE(date) as day, COUNT(*) as total')->groupBy('day')->pluck('total', 'day');
         $days = [];
         $thisWeekHours = 0.0;
         $lastWeekHours = 0.0;
         for ($i = 0; $i < 7; $i++) {
             $day = $weekStart->addDays($i);
             $slotHours = (float) $slotsByDay->get($day->dayOfWeek, collect())->sum(fn ($slot) => max(0, CarbonImmutable::parse($slot->ends_at)->diffInMinutes(CarbonImmutable::parse($slot->starts_at))) / 60);
-            $hours = min($slotHours, (int) $attendanceSlots->get($day->dayOfWeek, 0));
+            $hours = $attendedByDate->has($day->toDateString()) ? $slotHours : 0.0;
             $thisWeekHours += $hours;
             $days[] = ['label' => $day->format('D'), 'date' => $day->toDateString(), 'hours' => round($hours, 1), 'lastWeekHours' => 0];
         }
         for ($i = 0; $i < 7; $i++) {
             $day = $lastWeekStart->addDays($i);
             $slotHours = (float) $slotsByDay->get($day->dayOfWeek, collect())->sum(fn ($slot) => max(0, CarbonImmutable::parse($slot->ends_at)->diffInMinutes(CarbonImmutable::parse($slot->starts_at))) / 60);
-            $lastWeekHours += min($slotHours, (int) $attendanceSlots->get($day->dayOfWeek, 0));
-            $days[$i]['lastWeekHours'] = round(min($slotHours, (int) $attendanceSlots->get($day->dayOfWeek, 0)), 1);
+            $dayHours = $attendedByDate->has($day->toDateString()) ? $slotHours : 0.0;
+            $lastWeekHours += $dayHours;
+            $days[$i]['lastWeekHours'] = round($dayHours, 1);
         }
 
         $examRows = DB::table('results as r')
