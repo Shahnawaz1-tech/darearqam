@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ResultController;
 use App\Http\Controllers\RoleDashboardController;
 use App\Http\Controllers\TenantController;
 use Illuminate\Http\Request;
@@ -12,6 +14,11 @@ Route::get('/', function (Request $request) {
         ? to_route('dashboard')
         : Inertia::render('welcome');
 })->name('home');
+
+// Public form endpoints — no auth required
+Route::post('contact', ContactController::class)->name('contact.send');
+Route::post('results/internal', [ResultController::class, 'internal'])->name('results.internal');
+Route::post('results/wifaq', [ResultController::class, 'wifaq'])->name('results.wifaq');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

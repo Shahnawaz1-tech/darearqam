@@ -46,6 +46,14 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'is_platform_admin' => (bool) $request->user()?->isPlatformAdmin(),
             ],
+            'flash' => [
+                'contact_success' => $request->session()->get('contact_success'),
+                'contact_error'   => $request->session()->get('contact_error'),
+                'result_data'     => $request->session()->get('result_data'),
+                'result_error'    => $request->session()->get('result_error'),
+                'wifaq_data'      => $request->session()->get('wifaq_data'),
+                'wifaq_error'     => $request->session()->get('wifaq_error'),
+            ],
             'tenancy' => fn (): array => [
                 'tenants' => $tenantContext->tenants()
                     ->map(fn (Tenant $tenant): array => [

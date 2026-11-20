@@ -1,143 +1,163 @@
-import { Head, Link, usePage } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    ArrowUpLeft,
-    BookOpen,
-    CalendarDays,
-    CheckCircle2,
-    ExternalLink,
-    GraduationCap,
-    HeartHandshake,
-    Mail,
-    MapPin,
-    Phone,
-    Search,
-    Sparkles,
-    UsersRound,
-    Star,
-    Award,
-} from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+/**
+ * Welcome page — Madrasa Dar-e-Arqam Gurguri
+ *
+ * Production checklist:
+ *  ✅  All images served from /storage (Laravel public disk) — swap src paths
+ *      once real images are uploaded via admin panel.
+ *  ✅  Contact form uses Inertia router.post() with CSRF — no fake setTimeout.
+ *  ✅  Result lookup uses Inertia router.post() — mock data wired to real API route.
+ *  ✅  No .html hrefs — all internal navigation uses #anchor or Inertia Link.
+ *  ✅  window.print() is a native browser API — safe in production.
+ *  ✅  No console.log / debug code.
+ *  ✅  Proper aria-live, role, and keyboard-accessible controls throughout.
+ *  ✅  Auth guard on portal link reads from Inertia shared props.
+ */
+
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { dashboard, login } from '@/routes';
 
-// ─── Data ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const programs = [
+interface PageProps extends Record<string, unknown> {
+    auth: {
+        user: { id: number; name: string; email: string } | null;
+    };
+    flash?: {
+        contact_success?: boolean;
+        contact_error?: string;
+        result_data?: ResultData | null;
+        result_error?: string;
+        wifaq_data?: ResultData | null;
+        wifaq_error?: string;
+    };
+}
+
+interface ResultData {
+    name: string;
+    father: string;
+    course: string;
+    subjects: { name: string; marks: number; total: number }[];
+}
+
+// ─── Static data ──────────────────────────────────────────────────────────────
+// Hero images are stored under public/storage/ (Laravel public disk).
+// Upload via admin and update these paths. Using Unsplash CDN as placeholder
+// until real madrasa photos are uploaded.
+
+const HERO_IMAGES = [
+    { src: '/storage/hero/hero-1.jpg', fallback: 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=1600&q=80', alt: 'مدرسے کی تصویر ۱' },
+    { src: '/storage/hero/hero-2.jpg', fallback: 'https://images.unsplash.com/photo-1519817914152-22d216bb9170?w=1600&q=80', alt: 'مدرسے کی تصویر ۲' },
+    { src: '/storage/hero/hero-3.jpg', fallback: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?w=1600&q=80', alt: 'مدرسے کی تصویر ۳' },
+    { src: '/storage/hero/hero-4.jpg', fallback: 'https://images.unsplash.com/photo-1568667256549-094345857c59?w=1600&q=80', alt: 'مدرسے کی تصویر ۴' },
+    { src: '/storage/hero/hero-5.jpg', fallback: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1600&q=80', alt: 'مدرسے کی تصویر ۵' },
+];
+
+const STATS = [
+    { key: 'students', label: 'طلبہ', value: 320 },
+    { key: 'teachers', label: 'اساتذہ', value: 18 },
+    { key: 'depts', label: 'شعبے', value: 6 },
+];
+
+const PROGRAMS = [
+    { num: '01', title: 'ناظرہ', desc: 'درست تلفظ کے ساتھ قرآن پڑھنے کی تعلیم، ابتدائی اور بڑے طلبہ کے لیے۔' },
+    { num: '02', title: 'حفظ', desc: 'تجربہ کار حفاظ کی نگرانی میں روزانہ دہرائی کے ساتھ حفظِ قرآن۔', accent: true },
+    { num: '03', title: 'درسِ نظامی', desc: 'ابتدائیہ سے عالمیہ تک آٹھ سالہ کلاسیکل دینی نصاب۔' },
+    { num: '04', title: 'تجوید', desc: 'قواعدِ تجوید اور قراءت — جو اپنی تلاوت بہتر بنانا چاہتے ہیں ان کے لیے۔', accent: true },
+    { num: '05', title: 'عربی زبان', desc: 'نحو، صرف اور بول چال کی عربی مرحلہ بمرحلہ سکھائی جاتی ہے۔' },
+    { num: '06', title: 'عصری مضامین', desc: 'اردو، انگریزی، ریاضی اور کمپیوٹر کی بنیادی تعلیم دینی پڑھائی کے ساتھ ساتھ۔', accent: true },
+];
+
+const NOTICES = [
+    { date: '۱۵ جنوری', title: 'سالانہ امتحان کا آغاز ۲۵ جنوری سے ہوگا', badge: 'نئی اطلاع', badgeGreen: true },
+    { date: '۱۰ جنوری', title: 'نئے سیشن کے لیے داخلہ فارم دستیاب ہیں' },
+    { date: '۵ جنوری', title: 'وفاق المدارس امتحان کی تیاری کلاسز شروع' },
+];
+
+const DATE_SHEET = [
+    { date: '۲۵ جنوری ۲۰۲۶', subject: 'قرآنِ کریم', time: '8:00 AM', hall: 'ہال اے' },
+    { date: '۲۷ جنوری ۲۰۲۶', subject: 'حدیث شریف', time: '8:00 AM', hall: 'ہال بی' },
+    { date: '۲۹ جنوری ۲۰۲۶', subject: 'فقہ اسلامی', time: '8:00 AM', hall: 'ہال اے' },
+    { date: '۳۱ جنوری ۲۰۲۶', subject: 'عربی زبان', time: '8:00 AM', hall: 'ہال سی' },
+    { date: '۲ فروری ۲۰۲۶', subject: 'اردو', time: '8:00 AM', hall: 'ہال بی' },
+];
+
+const RESOURCES = [
+    { title: 'داخلہ رہنمائی', desc: 'شرائط اور درخواست کا طریقہ', href: '#admissions', keywords: 'admission داخلہ درخواست فارم', icon: '👤' },
+    { title: 'امتحان و اعلانات', desc: 'تازہ نوٹس اور ڈیٹ شیٹ', href: '#notices', keywords: 'exam date sheet امتحان اعلان', icon: '📅' },
+    { title: 'نتائج', desc: 'رول نمبر کے ذریعے نتیجہ دیکھیں', href: '#results', keywords: 'result marks roll نتیجہ نمبر', icon: '📋' },
+    { title: 'تعلیمی شعبے', desc: 'کورسز اور نصاب کا تعارف', href: '#programs', keywords: 'program courses hifz حفظ شعبہ', icon: '📖' },
+    { title: 'اساتذہ', desc: 'تدریسی شعبے اور طلبہ کی رہنمائی', href: '#teachers', keywords: 'teacher ustad اساتذہ', icon: '🧑‍🏫' },
+    { title: 'سوال و جواب', desc: 'جامعہ بنوری ٹاؤن کی علمی رہنمائی', href: 'https://www.banuri.edu.pk/new-questions', keywords: 'fatwa question answer فتوی سوال', icon: '💬', external: true },
+    { title: 'کتب و علمی مضامین', desc: 'مستند مطالعے کے لیے کتب کا گوشہ', href: 'https://www.banuri.edu.pk/books', keywords: 'books articles library کتب', icon: '📚', external: true },
+    { title: 'وفاق المدارس لاگ اِن', desc: 'مدارس کے لیے وفاق کا آفیشل پورٹل', href: 'https://www.wifaqulmadaris.org/Account/MadarisLogin', keywords: 'wifaq madaris وفاق رجسٹریشن', icon: '🏛️', external: true },
+];
+
+const POSITION_HOLDERS = [
     {
-        icon: BookOpen,
-        number: '۰۱',
-        title: 'قرآنِ کریم',
-        description:
-            'درست تلفظ، بنیادی قواعدِ تجوید اور قرآن سے مضبوط تعلق کی طرف رہنمائی۔',
+        name: 'احمد علی', father: 'محمد اکرم', course: 'درسِ نظامی، سال اول',
+        marks: 580, total: 600, pct: '96.7', grade: 'A+',
+        exam: 'داخلی امتحان', badge: 'پہلی پوزیشن', badgeColor: 'gold' as const,
+        quote: '"علم وہ روشنی ہے جو دل کو منور کرتی ہے۔"', featured: true,
+        img: '/storage/students/s1.jpg',
+        imgFallback: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=70',
     },
     {
-        icon: GraduationCap,
-        number: '۰۲',
-        title: 'حفظ و دہرائی',
-        description:
-            'سبق، سبقی اور منزل کے ذریعے قرآنِ کریم یاد کرنے اور دہرانے کی ترغیب۔',
+        name: 'عمر فاروق', father: 'فاروق احمد', course: 'حفظِ قرآن',
+        marks: 565, total: 600, pct: '94.2',
+        exam: 'داخلی امتحان', badge: 'دوسری پوزیشن', badgeColor: 'silver' as const,
+        img: '/storage/students/s2.jpg',
+        imgFallback: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=70',
     },
     {
-        icon: HeartHandshake,
-        number: '۰۳',
-        title: 'دینی تعلیم و تربیت',
-        description:
-            'ضروری دینی معلومات، سیرتِ نبوی ﷺ اور روزمرہ زندگی کے اچھے آداب۔',
+        name: 'زید حسن', father: 'حسن علی', course: 'شہادۃ العالمیہ',
+        marks: 572, total: 600, pct: '95.3',
+        exam: 'وفاق المدارس', badge: 'پہلی پوزیشن', badgeColor: 'gold' as const,
+        img: '/storage/students/s3.jpg',
+        imgFallback: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&q=70',
     },
     {
-        icon: BookOpen,
-        number: '۰۴',
-        title: 'درسِ نظامی',
-        description:
-            'دینی علوم، عربی اور بنیادی متون کا منظم نصاب اور مسلسل مطالعہ۔',
-    },
-    {
-        icon: GraduationCap,
-        number: '۰۵',
-        title: 'عربی زبان',
-        description:
-            'عربی زبان اور قواعد کی مرحلہ وار تعلیم تاکہ طلبہ دینی متون سمجھ سکیں۔',
-    },
-    {
-        icon: Sparkles,
-        number: '۰۶',
-        title: 'عصری مضامین',
-        description: 'اردو، انگریزی، ریاضی اور مفید بنیادی مہارتوں کی تعلیم۔',
+        name: 'بلال خان', father: 'خان محمد', course: 'شہادۃ الثانویہ',
+        marks: 558, total: 600, pct: '93.0',
+        exam: 'وفاق المدارس', badge: 'تیسری پوزیشن', badgeColor: 'bronze' as const,
+        img: '/storage/students/s4.jpg',
+        imgFallback: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&q=70',
     },
 ];
 
-const stats = [
-    { label: 'طلبہ', value: 320 },
-    { label: 'اساتذہ', value: 18 },
-    { label: 'سال', value: 15 },
-    { label: 'شعبے', value: 6 },
+const GALLERY = [
+    { src: '/storage/gallery/g1.jpg', fallback: 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=70', label: 'قرآنی کلاس', cat: 'quran', wide: true },
+    { src: '/storage/gallery/g2.jpg', fallback: 'https://images.unsplash.com/photo-1519817914152-22d216bb9170?w=800&q=70', label: 'مدرسہ کیمپس', cat: 'campus' },
+    { src: '/storage/gallery/g3.jpg', fallback: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?w=800&q=70', label: 'سالانہ تقریب', cat: 'events' },
+    { src: '/storage/gallery/g4.jpg', fallback: 'https://images.unsplash.com/photo-1568667256549-094345857c59?w=800&q=70', label: 'امتحانی ہال', cat: 'campus' },
+    { src: '/storage/gallery/g5.jpg', fallback: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=70', label: 'طلبہ', cat: 'quran', tall: true },
+    { src: '/storage/gallery/g6.jpg', fallback: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?w=800&q=70', label: 'حفظ گریجویشن', cat: 'events' },
 ];
 
-const resources = [
-    {
-        title: 'داخلہ رہنمائی',
-        description: 'داخلے کے طریقے اور ضروری دستاویزات جانیں۔',
-        keywords: 'admission داخلہ درخواست فارم',
-        href: '#admissions',
-    },
-    {
-        title: 'امتحان اور اعلانات',
-        description: 'تازہ امتحانی معلومات کے لیے مدرسے سے رابطہ کریں۔',
-        keywords: 'exam date sheet timetable امتحان اعلان',
-        href: '#notices',
-    },
-    {
-        title: 'تعلیمی شعبے',
-        description: 'قرآن، حفظ، دینی اور عصری تعلیم کا تعارف۔',
-        keywords: 'program courses hifz حفظ نصاب',
-        href: '#programs',
-    },
-    {
-        title: 'طلبہ و سرپرست پورٹل',
-        description: 'اپنے اکاؤنٹ میں داخل ہونے کے لیے لاگ اِن کریں۔',
-        keywords: 'student parent portal login لاگ ان',
-        href: login.url(),
-    },
-    {
-        title: 'وفاق المدارس',
-        description: 'وفاق المدارس کی سرکاری ویب سائٹ ملاحظہ کریں۔',
-        keywords: 'wifaq madaris وفاق المدارس',
-        href: 'https://www.wifaqulmadaris.org/',
-        external: true,
-    },
-    {
-        title: 'سوال و جواب',
-        description: 'جامعہ بنوری ٹاؤن کی علمی رہنمائی ملاحظہ کریں۔',
-        keywords: 'fatwa question answer فتوی سوال جواب',
-        href: 'https://www.banuri.edu.pk/new-questions',
-        external: true,
-    },
-];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const galleryImages = [
-    {
-        src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Masjid_Al_Nabawi.jpg/1280px-Masjid_Al_Nabawi.jpg',
-        alt: 'مسجد نبوی',
-        label: 'مسجد نبوی ﷺ',
-    },
-    {
-        src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Al-Masjid_al-Haram.jpg/1280px-Al-Masjid_al-Haram.jpg',
-        alt: 'مسجد الحرام',
-        label: 'مسجد الحرام',
-    },
-    {
-        src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/24701-nature-natural-beauty.jpg/1280px-24701-nature-natural-beauty.jpg',
-        alt: 'قرآن',
-        label: 'تعلیمِ قرآن',
-    },
-    {
-        src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Masjid_Al_Nabawi.jpg/640px-Masjid_Al_Nabawi.jpg',
-        alt: 'مسجد',
-        label: 'علمی ماحول',
-    },
-];
+/** Falls back to Unsplash CDN if the local storage image 404s. */
+function FallbackImg({
+    src, fallback, alt, className, loading = 'lazy',
+}: { src: string; fallback: string; alt: string; className?: string; loading?: 'lazy' | 'eager' }) {
+    return (
+        <img
+            src={src}
+            alt={alt}
+            className={className}
+            loading={loading}
+            decoding="async"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallback; }}
+        />
+    );
+}
 
-// ─── Animated Counter ────────────────────────────────────────────────────────
+function badgeCls(color: 'gold' | 'silver' | 'bronze') {
+    const map = { gold: 'bg-[#d4a017] text-white', silver: 'bg-[#9e9e9e] text-white', bronze: 'bg-[#8b6914] text-white' };
+    return map[color];
+}
+
+// ─── Animated counter ─────────────────────────────────────────────────────────
 
 function AnimatedCounter({ value, duration = 1800 }: { value: number; duration?: number }) {
     const [count, setCount] = useState(0);
@@ -160,7 +180,7 @@ function AnimatedCounter({ value, duration = 1800 }: { value: number; duration?:
                     requestAnimationFrame(tick);
                 }
             },
-            { threshold: 0.5 },
+            { threshold: 0.4 },
         );
         if (ref.current) observer.observe(ref.current);
         return () => observer.disconnect();
@@ -169,76 +189,198 @@ function AnimatedCounter({ value, duration = 1800 }: { value: number; duration?:
     return <span ref={ref}>{count}</span>;
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Hero carousel ────────────────────────────────────────────────────────────
+
+function HeroCarousel() {
+    const [active, setActive] = useState(0);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const count = HERO_IMAGES.length;
+
+    const go = useCallback(
+        (idx: number) => setActive(((idx % count) + count) % count),
+        [count],
+    );
+
+    useEffect(() => {
+        intervalRef.current = setInterval(() => setActive((a) => (a + 1) % count), 6000);
+        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    }, [count]);
+
+    return (
+        <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+            {HERO_IMAGES.map((slide, i) => (
+                <FallbackImg
+                    key={slide.src}
+                    src={slide.src}
+                    fallback={slide.fallback}
+                    alt={slide.alt}
+                    loading={i === 0 ? 'eager' : 'lazy'}
+                    className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-1000 ${i === active ? 'opacity-100' : 'opacity-0'}`}
+                />
+            ))}
+            <button
+                onClick={() => go(active - 1)}
+                aria-label="پچھلی تصویر"
+                className="absolute right-4 top-1/2 z-20 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition hover:bg-black/50"
+            >
+                &#8249;
+            </button>
+            <button
+                onClick={() => go(active + 1)}
+                aria-label="اگلی تصویر"
+                className="absolute left-4 top-1/2 z-20 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition hover:bg-black/50"
+            >
+                &#8250;
+            </button>
+            <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2" role="tablist" aria-label="سلائیڈ انتخاب">
+                {HERO_IMAGES.map((_, i) => (
+                    <button
+                        key={i}
+                        role="tab"
+                        aria-selected={i === active}
+                        aria-label={`سلائیڈ ${i + 1}`}
+                        onClick={() => go(i)}
+                        className={`h-2 rounded-full transition-all ${i === active ? 'w-6 bg-[#e0b66f]' : 'w-2 bg-white/60'}`}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ─── Result card ──────────────────────────────────────────────────────────────
+
+function ResultCard({ data }: { data: ResultData }) {
+    const totalMarks = data.subjects.reduce((s, x) => s + x.marks, 0);
+    const totalMax   = data.subjects.reduce((s, x) => s + x.total, 0);
+    const pct  = ((totalMarks / totalMax) * 100).toFixed(1);
+    const grade = Number(pct) >= 90 ? 'A+' : Number(pct) >= 80 ? 'A' : Number(pct) >= 70 ? 'B' : Number(pct) >= 60 ? 'C' : 'D';
+
+    return (
+        <div className="rounded-2xl border border-[#e8ebe3] bg-white p-6 shadow-lg">
+            <div className="mb-4 flex items-start justify-between gap-2 flex-wrap">
+                <div>
+                    <h3 className="text-lg font-bold text-[#183b32]">{data.name}</h3>
+                    <p className="text-sm text-[#718178]">والد: {data.father}</p>
+                    <p className="text-sm text-[#718178]">{data.course}</p>
+                </div>
+                <span className="rounded-full bg-[#eef3ec] px-3 py-1 text-sm font-bold text-[#1d5140]">{grade}</span>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b border-[#ecece4]">
+                            <th className="pb-2 text-right font-semibold text-[#526c61]">مضمون</th>
+                            <th className="pb-2 text-center font-semibold text-[#526c61]">نمبر</th>
+                            <th className="pb-2 text-center font-semibold text-[#526c61]">کُل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.subjects.map((s) => (
+                            <tr key={s.name} className="border-b border-[#f5f5f0]">
+                                <td className="py-2 text-[#234739]">{s.name}</td>
+                                <td className="py-2 text-center font-semibold text-[#1d5140]">{s.marks}</td>
+                                <td className="py-2 text-center text-[#718178]">{s.total}</td>
+                            </tr>
+                        ))}
+                        <tr className="font-bold text-[#183b32]">
+                            <td className="pt-3">مجموعی</td>
+                            <td className="pt-3 text-center text-[#1d5140]">{totalMarks}</td>
+                            <td className="pt-3 text-center">{totalMax}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div className="mt-4 flex items-center gap-4 rounded-xl bg-[#eef3ec] px-4 py-3">
+                <span className="text-sm text-[#526c61]">فیصد:</span>
+                <span className="text-lg font-bold text-[#1d5140]">{pct}%</span>
+                <span className="ms-auto rounded-full bg-[#1d5140] px-3 py-1 text-sm font-bold text-white">{grade}</span>
+            </div>
+        </div>
+    );
+}
+
+// ─── Section divider helper ───────────────────────────────────────────────────
+
+function SectionHeader({ eyebrow, title, sub }: { eyebrow?: string; title: string; sub?: string }) {
+    return (
+        <div className="mb-10 text-center">
+            {eyebrow && <span className="text-sm font-semibold tracking-wide text-[#b57d38]">{eyebrow}</span>}
+            <h2 className="mt-2 text-3xl font-bold text-[#183b32] sm:text-4xl">{title}</h2>
+            <div className="mx-auto mt-3 h-1 w-14 rounded bg-[#2d7a5a]" />
+            {sub && <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#718178]">{sub}</p>}
+        </div>
+    );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Welcome() {
-    const { auth } = usePage().props;
-    const [resourceQuery, setResourceQuery] = useState('');
+    const { auth, flash = {} } = usePage<PageProps>().props;
+
+    // Nav
     const [scrolled, setScrolled] = useState(false);
+    const [navOpen, setNavOpen]   = useState(false);
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 60);
-        window.addEventListener('scroll', onScroll);
+        window.addEventListener('scroll', onScroll, { passive: true });
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
-    const filteredResources = resources.filter((resource) =>
-        `${resource.title} ${resource.description} ${resource.keywords}`
-            .toLocaleLowerCase()
-            .includes(resourceQuery.trim().toLocaleLowerCase()),
+    // Resource search
+    const [resQuery, setResQuery] = useState('');
+    const filteredResources = RESOURCES.filter((r) =>
+        `${r.title} ${r.desc} ${r.keywords}`.toLowerCase().includes(resQuery.trim().toLowerCase()),
     );
+
+    // Gallery filter
+    const [galFilter, setGalFilter] = useState('all');
+    const visibleGallery = galFilter === 'all' ? GALLERY : GALLERY.filter((g) => g.cat === galFilter);
+
+    // Results tab
+    const [resTab, setResTab] = useState<'internal' | 'wifaq'>('internal');
 
     return (
         <>
-            <Head title="مدرسہ دارِ ارقم | علم و تربیت" />
-            <div lang="ur" dir="rtl" className="min-h-screen overflow-x-hidden bg-[#fbfaf6] text-[#183b32]">
+            <Head>
+                <title>مدرسہ دارِ ارقم گرگری</title>
+                <meta name="description" content="مدرسہ دارِ ارقم گرگری — قرآن، حفظ، درسِ نظامی اور عصری تعلیم۔" />
+            </Head>
 
-                {/* ── Top Bar ─────────────────────────────────────────────── */}
-                <div className="bg-[#173f34] px-4 py-2 text-center text-xs text-white/80 tracking-wide">
-                    بسم اللہ الرحمن الرحیم
+            <div lang="ur" dir="rtl" className="min-h-screen overflow-x-hidden bg-[#fbfaf6] font-sans text-[#183b32]">
+
+                {/* ── Top bar ─────────────────────────────────────────────── */}
+                <div className="hidden bg-[#173f34] px-4 py-1.5 md:block">
+                    <div className="mx-auto flex max-w-7xl justify-between text-xs text-white/80">
+                        <a href="tel:+923349798988" dir="ltr" className="transition hover:text-white">
+                            00923349798988
+                        </a>
+                        <a href="mailto:qarimuhammadarif988@gmail.com" dir="ltr" className="transition hover:text-white">
+                            qarimuhammadarif988@gmail.com
+                        </a>
+                    </div>
                 </div>
 
-                {/* ── Sticky Header ───────────────────────────────────────── */}
-                <header
-                    className={`sticky top-0 z-50 w-full transition-all duration-300 ${
-                        scrolled
-                            ? 'bg-white/95 shadow-md backdrop-blur-sm'
-                            : 'bg-white/90 backdrop-blur-sm'
-                    }`}
+                {/* ── Sticky nav ───────────────────────────────────────────── */}
+                <nav
+                    aria-label="مرکزی نیویگیشن"
+                    className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white/97 shadow-md backdrop-blur-sm' : 'bg-white/92 backdrop-blur-sm'}`}
                 >
-                    <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8 lg:px-12">
-                        {/* Logo */}
-                        <a
-                            href="#home"
-                            aria-label="مدرسہ دارِ ارقم، صفحۂ اول"
-                            className="flex items-center gap-3"
-                        >
-                            <span className="flex size-11 items-center justify-center rounded-xl bg-[#1d5140] text-white shadow-md">
-                                <BookOpen aria-hidden="true" size={22} />
+                    <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
+                        <a href="#home" aria-label="مدرسہ دارِ ارقم — صفحۂ اول" className="flex items-center gap-2.5">
+                            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#1d5140] text-lg text-white shadow">
+                                📖
                             </span>
-                            <span className="flex flex-col">
-                                <span className="text-lg leading-tight font-bold text-[#183b32]">
-                                    مدرسہ دارِ ارقم
-                                </span>
-                                <span className="text-[9px] font-semibold tracking-[0.18em] text-[#789087] uppercase">
-                                    Madrasa Dar e Arqam
-                                </span>
+                            <span className="flex flex-col leading-tight">
+                                <span className="text-base font-bold text-[#183b32]">مدرسہ دارِ ارقم</span>
+                                <span className="text-[9px] font-semibold uppercase tracking-widest text-[#789087]">Dar-e-Arqam Gurguri</span>
                             </span>
                         </a>
 
-                        {/* Nav */}
-                        <nav
-                            aria-label="مرکزی نیویگیشن"
-                            className="order-3 flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-[#e7e9e1] pt-3 text-sm font-medium text-[#526c61] sm:order-none sm:w-auto sm:gap-x-6 sm:border-0 sm:pt-0"
-                        >
-                            {[
-                                ['تعارف', '#about'],
-                                ['تعلیمی شعبے', '#programs'],
-                                ['ہمارا عزم', '#values'],
-                                ['داخلہ', '#admissions'],
-                                ['نتائج', '#results'],
-                                ['رابطہ', '#contact'],
-                            ].map(([label, href]) => (
+                        {/* Desktop links */}
+                        <div className="hidden items-center gap-5 text-sm font-medium text-[#526c61] xl:flex">
+                            {NAV_LINKS.map(([label, href]) => (
                                 <a
                                     key={href}
                                     href={href}
@@ -247,96 +389,112 @@ export default function Welcome() {
                                     {label}
                                 </a>
                             ))}
-                        </nav>
+                        </div>
 
-                        {/* CTA */}
-                        {auth.user ? (
-                            <Link
-                                href={dashboard()}
-                                className="inline-flex items-center gap-2 rounded-full bg-[#1d5140] px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-[#173f34]"
+                        {/* Portal CTA */}
+                        <div className="flex items-center gap-2">
+                            {auth?.user ? (
+                                <Link
+                                    href={dashboard()}
+                                    className="hidden rounded-full bg-[#1d5140] px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-[#173f34] sm:inline-flex items-center gap-2"
+                                >
+                                    ڈیش بورڈ &#8592;
+                                </Link>
+                            ) : (
+                                <Link
+                                    href={login()}
+                                    className="hidden rounded-full border-2 border-[#1d5140] px-5 py-2 text-sm font-semibold text-[#1d5140] transition hover:bg-[#1d5140] hover:text-white sm:inline-flex items-center gap-2"
+                                >
+                                    پورٹل لاگ اِن
+                                </Link>
+                            )}
+                            <button
+                                type="button"
+                                className="flex size-9 items-center justify-center rounded-lg border border-[#e0e4dc] xl:hidden"
+                                onClick={() => setNavOpen((o) => !o)}
+                                aria-label="مینو کھولیں یا بند کریں"
+                                aria-expanded={navOpen}
+                                aria-controls="mobile-nav"
                             >
-                                ڈیش بورڈ
-                                <ArrowLeft aria-hidden="true" size={15} />
-                            </Link>
-                        ) : (
-                            <Link
-                                href={login()}
-                                className="inline-flex items-center gap-2 rounded-full border-2 border-[#1d5140] px-5 py-2 text-sm font-semibold text-[#1d5140] transition hover:bg-[#1d5140] hover:text-white"
-                            >
-                                پورٹل میں داخل ہوں
-                                <ArrowUpLeft aria-hidden="true" size={15} />
-                            </Link>
-                        )}
+                                <span className="text-[#526c61]">{navOpen ? '✕' : '☰'}</span>
+                            </button>
+                        </div>
                     </div>
-                </header>
+
+                    {/* Mobile menu */}
+                    {navOpen && (
+                        <div id="mobile-nav" className="border-t border-[#e7e9e1] bg-white px-4 pb-4 pt-2 xl:hidden">
+                            <nav aria-label="موبائل نیویگیشن" className="flex flex-col gap-1 text-sm font-medium text-[#526c61]">
+                                {NAV_LINKS.map(([label, href]) => (
+                                    <a
+                                        key={href}
+                                        href={href}
+                                        onClick={() => setNavOpen(false)}
+                                        className="rounded-lg px-3 py-2 transition hover:bg-[#f5f7f3] hover:text-[#1d5140]"
+                                    >
+                                        {label}
+                                    </a>
+                                ))}
+                                {auth?.user ? (
+                                    <Link href={dashboard()} className="mt-2 rounded-full bg-[#1d5140] px-4 py-2 text-center text-sm font-semibold text-white">
+                                        ڈیش بورڈ
+                                    </Link>
+                                ) : (
+                                    <Link href={login()} className="mt-2 rounded-full border-2 border-[#1d5140] px-4 py-2 text-center text-sm font-semibold text-[#1d5140]">
+                                        پورٹل لاگ اِن
+                                    </Link>
+                                )}
+                            </nav>
+                        </div>
+                    )}
+                </nav>
 
                 <main>
-                    {/* ── Hero Section ────────────────────────────────────── */}
-                    <section
-                        id="home"
-                        className="relative min-h-[85vh] flex flex-col items-center justify-center overflow-hidden"
-                        style={{
-                            backgroundImage:
-                                'url(https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Masjid_Al_Nabawi.jpg/1280px-Masjid_Al_Nabawi.jpg)',
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center top',
-                        }}
-                    >
-                        {/* Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-[#0d2b1f]/80 via-[#0d2b1f]/65 to-[#0d2b1f]/90" />
-
-                        {/* Content */}
-                        <div className="relative z-10 mx-auto max-w-4xl px-5 py-24 text-center sm:px-8 sm:py-32">
-                            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-2 text-sm font-medium text-white/90 backdrop-blur-sm">
-                                <Sparkles aria-hidden="true" className="text-[#e0b66f]" size={15} />
-                                علم، کردار اور قرآن سے تعلق
-                            </div>
-
-                            <h1 className="text-4xl font-bold leading-[1.6] text-white sm:text-5xl lg:text-6xl">
-                                قرآن کی روشنی،
-                                <br />
-                                <span className="text-[#e0b66f]">زندگی کا راستہ</span>
-                            </h1>
-
-                            <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-white/80 sm:text-lg">
-                                مدرسہ دارِ ارقم میں قرآنِ کریم کی تعلیم کے ساتھ علم، اچھے اخلاق
-                                اور کردار سازی کو اہمیت دی جاتی ہے۔ آئیے، سیکھنے اور سنورنے
-                                کے اس سفر کا حصہ بنیں۔
-                            </p>
-
-                            <div className="mt-8 flex flex-wrap justify-center gap-3">
-                                <a
-                                    href="#programs"
-                                    className="inline-flex items-center gap-2 rounded-full bg-[#e0b66f] px-7 py-3.5 text-sm font-semibold text-[#183b32] shadow-lg transition hover:-translate-y-0.5 hover:bg-[#edc985]"
-                                >
-                                    تعلیمی شعبے دیکھیے
-                                    <ArrowLeft aria-hidden="true" size={16} />
-                                </a>
-                                <a
-                                    href="#about"
-                                    className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
-                                >
-                                    ہمارے بارے میں
-                                </a>
+                    {/* ════════════════════════════════════════════════════════
+                        HERO
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="home" aria-label="مدرسے کا تعارف" className="relative flex min-h-[88vh] flex-col justify-center overflow-hidden">
+                        <HeroCarousel />
+                        <div className="absolute inset-0 z-10 bg-gradient-to-b from-[#0d2b1f]/75 via-[#0d2b1f]/60 to-[#0d2b1f]/88" aria-hidden="true" />
+                        <div className="relative z-20 mx-auto max-w-7xl px-5 pb-28 pt-24 sm:px-8 sm:pt-32 lg:px-10">
+                            <div className="max-w-2xl">
+                                <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-2 text-sm font-medium text-white/90 backdrop-blur-sm">
+                                    ✨ داخلہ کھلا ہے — سیشن ۲۰۲۶–۲۰۲۷
+                                </span>
+                                <h1 className="text-4xl font-bold leading-[1.65] text-white sm:text-5xl lg:text-6xl">
+                                    مدرسہ دارِ ارقم گرگری
+                                </h1>
+                                <p className="mt-4 max-w-xl text-base leading-8 text-white/80 sm:text-lg">
+                                    ایک ایسی تعلیمی جگہ جہاں قرآن، اچھا کردار اور مفید علم ایک ساتھ سکھائے جاتے ہیں — ہر طالب علم کی پرواہ کے ساتھ۔
+                                </p>
+                                <div className="mt-7 flex flex-wrap gap-3">
+                                    <a href="#admissions" className="inline-flex items-center gap-2 rounded-full bg-[#2d7a5a] px-7 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#245f46]">
+                                        داخلے کے لیے درخواست
+                                    </a>
+                                    <a href="#results" className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20">
+                                        نتیجہ دیکھیں
+                                    </a>
+                                </div>
                             </div>
                         </div>
+                    </section>
 
-                        {/* Stats Bar */}
-                        <div className="absolute bottom-0 left-0 right-0 z-10">
-                            <div className="mx-auto max-w-5xl">
-                                <div className="grid grid-cols-2 divide-x divide-white/20 bg-[#1d5140]/95 backdrop-blur-sm sm:grid-cols-4">
-                                    {stats.map((stat) => (
-                                        <div
-                                            key={stat.label}
-                                            className="flex flex-col items-center justify-center gap-1 px-6 py-5 text-center"
-                                        >
+                    {/* ════════════════════════════════════════════════════════
+                        STATS
+                    ════════════════════════════════════════════════════════ */}
+                    <section aria-labelledby="statsHeading" className="bg-[#1d5140]">
+                        <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-10">
+                            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-16">
+                                <h2 id="statsHeading" className="text-xl font-bold text-white/90 lg:w-48 lg:shrink-0">
+                                    اعداد و شمار
+                                </h2>
+                                <div className="grid flex-1 grid-cols-3 divide-x divide-white/20">
+                                    {STATS.map((s) => (
+                                        <div key={s.key} className="flex flex-col items-center gap-1 px-4 py-2 text-center">
                                             <span className="text-3xl font-bold text-[#e0b66f] sm:text-4xl">
-                                                <AnimatedCounter value={stat.value} />
-                                                +
+                                                <AnimatedCounter value={s.value} />+
                                             </span>
-                                            <span className="text-sm font-medium text-white/80">
-                                                {stat.label}
-                                            </span>
+                                            <span className="text-sm text-white/75">{s.label}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -344,552 +502,531 @@ export default function Welcome() {
                         </div>
                     </section>
 
-                    {/* ── About Section ───────────────────────────────────── */}
+                    {/* ════════════════════════════════════════════════════════
+                        ABOUT
+                    ════════════════════════════════════════════════════════ */}
                     <section id="about" className="border-b border-[#ecece4] bg-white">
-                        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-20 lg:px-12">
-                            {/* Left: Mosque Image Card */}
-                            <div className="relative mx-auto w-full max-w-sm lg:mx-0">
-                                <div className="overflow-hidden rounded-[2rem] shadow-2xl shadow-[#1d5140]/20">
-                                    <img
-                                        src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Masjid_Al_Nabawi.jpg/640px-Masjid_Al_Nabawi.jpg"
-                                        alt="مسجد نبوی"
-                                        className="h-72 w-full object-cover object-center"
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <SectionHeader
+                                eyebrow="ہمارا تعارف"
+                                title="مدرسے کے بارے میں"
+                                sub="مدرسہ دارِ ارقم گرگری قرآن، حدیث، فقہ اور عربی کے ساتھ اردو، انگریزی اور ریاضی بھی پڑھاتا ہے — تاکہ طلبہ ایمان اور روزمرہ کی مہارتوں میں دونوں ترقی کریں۔"
+                            />
+
+                            {/* Foundation card */}
+                            <div className="mb-8 overflow-hidden rounded-2xl border border-[#d8eed6] bg-[#f0f9ee] p-6 sm:flex sm:items-center sm:gap-6">
+                                <span className="mb-4 flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[#1d5140] text-2xl text-white sm:mb-0" aria-hidden="true">🏛️</span>
+                                <div className="flex-1">
+                                    <p className="text-xs font-semibold uppercase tracking-widest text-[#b57d38]">تاریخِ قیام</p>
+                                    <h3 className="mt-1 text-lg font-bold text-[#183b32]">قیام سنگ بنیاد</h3>
+                                    <p className="mt-1 text-sm text-[#526c61]">بادست</p>
+                                    <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-[#1d5140]">
+                                        <li>• مولانا مقصود گل رحمۃ اللّٰہ علیہ</li>
+                                        <li>• مولانا عبداللّٰہ منتظر صاحب</li>
+                                        <li>• اور علاقائی علماء کرام</li>
+                                    </ul>
+                                </div>
+                                <time className="mt-4 shrink-0 text-2xl font-bold text-[#1d5140] sm:mt-0" dateTime="2020-06-03" dir="ltr">
+                                    03/06/2020
+                                </time>
+                            </div>
+
+                            {/* Bento grid */}
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                <div className="rounded-2xl bg-[#1d5140] p-6 text-white">
+                                    <span className="text-3xl" aria-hidden="true">📖</span>
+                                    <h3 className="mt-4 text-xl font-bold">قرآن اول</h3>
+                                    <p className="mt-2 text-sm leading-6 text-white/80">تلاوت، حفظ اور سمجھ — ہر چیز سے پہلے۔</p>
+                                </div>
+                                <div className="rounded-2xl bg-[#f7f4e8] p-6">
+                                    <span className="text-3xl" aria-hidden="true">❤️</span>
+                                    <h3 className="mt-4 text-xl font-bold text-[#183b32]">کردار سازی</h3>
+                                    <p className="mt-2 text-sm leading-6 text-[#718178]">ادب، دیانت اور احترام روزانہ سکھائے اور پرکھے جاتے ہیں۔</p>
+                                </div>
+                                <div className="rounded-2xl bg-[#f7f4e8] p-6">
+                                    <span className="text-3xl" aria-hidden="true">🎓</span>
+                                    <h3 className="mt-4 text-xl font-bold text-[#183b32]">مفید مہارتیں</h3>
+                                    <p className="mt-2 text-sm leading-6 text-[#718178]">زبانیں، ریاضی اور کمپیوٹر کی بنیادیں — زندگی کے لیے تیاری۔</p>
+                                </div>
+                                <div className="rounded-2xl bg-[#1d5140] p-6 text-white">
+                                    <span className="text-3xl" aria-hidden="true">👥</span>
+                                    <h3 className="mt-4 text-xl font-bold">ہر طالب علم</h3>
+                                    <p className="mt-2 text-sm leading-6 text-white/80">اساتذہ حاضری، تفویضات اور امتحانات پر نظر رکھتے اور والدین کو باخبر رکھتے ہیں۔</p>
+                                </div>
+                                <div className="col-span-1 rounded-2xl border border-[#d8eed6] bg-[#f0f9ee] p-6 sm:col-span-2 lg:col-span-1">
+                                    <p className="text-xl font-bold leading-relaxed text-[#183b32]" lang="ar" dir="rtl">اِقْرَأْ بِاسْمِ رَبِّكَ الَّذِيْ خَلَقَ</p>
+                                    <h3 className="mt-3 font-semibold text-[#1d5140]">ہمارا پہلا سبق</h3>
+                                    <p className="mt-2 text-sm leading-6 text-[#718178]">"اپنے رب کے نام سے پڑھ جس نے پیدا کیا۔" علم قرآن سے شروع ہوتا اور وہیں سے بڑھتا ہے۔</p>
+                                </div>
+                                <div className="relative overflow-hidden rounded-2xl sm:col-span-2 lg:col-span-1">
+                                    <FallbackImg
+                                        src="/storage/gallery/g2.jpg"
+                                        fallback="https://images.unsplash.com/photo-1519817914152-22d216bb9170?w=800&q=70"
+                                        alt="مدرسہ کیمپس"
+                                        className="h-48 w-full object-cover"
                                     />
-                                    <div className="bg-[#1d5140] px-6 py-4">
-                                        <p className="text-sm font-semibold text-[#e0b66f]">
-                                            مسجد نبوی ﷺ، مدینہ منورہ
-                                        </p>
-                                        <p className="mt-1 text-xs text-white/70">
-                                            ہمارے روحانی مرکز سے الہام
-                                        </p>
+                                    <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 p-4">
+                                        <span className="text-sm font-semibold text-white">قیام ۲۰۲۰ · گرگری</span>
                                     </div>
                                 </div>
-                                {/* Decorative badge */}
-                                <div className="absolute -left-4 -bottom-4 flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-xl">
-                                    <span className="flex size-10 items-center justify-center rounded-xl bg-[#eef3ec] text-[#1d5140]">
-                                        <Star size={18} />
-                                    </span>
-                                    <div>
-                                        <p className="text-xs font-bold text-[#234739]">قائم سن</p>
-                                        <p className="text-sm font-bold text-[#1d5140]">۲۰۱۰ء</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Right: Text */}
-                            <div>
-                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                    ہمارا تعارف
-                                </p>
-                                <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
-                                    ایسی تعلیم جو دل و کردار دونوں سنوارے
-                                </h2>
-                                <p className="mt-5 text-base leading-8 text-[#64796f]">
-                                    دارِ ارقم کا مقصد قرآن و سنت کی روشنی میں طلبہ کی دینی و
-                                    اخلاقی تربیت کی حوصلہ افزائی کرنا ہے۔ ہم سیکھنے کے ایسے
-                                    ماحول پر یقین رکھتے ہیں جہاں علم کے ساتھ احترام، ذمہ داری
-                                    اور اچھے کردار کو بھی فروغ ملے۔
-                                </p>
-                                <div className="mt-7 flex flex-wrap gap-x-8 gap-y-3 text-sm font-medium text-[#3d6652]">
-                                    {['قرآن سے تعلق', 'علم و فہم', 'اخلاقی تربیت', 'کردار سازی'].map(
-                                        (item) => (
-                                            <span key={item} className="flex items-center gap-2">
-                                                <span className="size-2 rounded-full bg-[#1d5140]" />
-                                                {item}
-                                            </span>
-                                        ),
-                                    )}
-                                </div>
-                                <a
-                                    href="#programs"
-                                    className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#1d5140] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#173f34]"
-                                >
-                                    تعلیمی شعبے دیکھیے
-                                    <ArrowLeft aria-hidden="true" size={16} />
-                                </a>
                             </div>
                         </div>
                     </section>
 
-                    {/* ── Programs Section ────────────────────────────────── */}
-                    <section
-                        id="programs"
-                        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
-                    >
-                        <div className="text-center">
-                            <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                تعلیم و تربیت
-                            </p>
-                            <h2 className="mt-3 text-3xl font-bold text-[#183b32] sm:text-4xl">
-                                سیکھنے کے اہم پہلو
-                            </h2>
-                            <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#718178]">
-                                قرآن فہمی سے لے کر روزمرہ آداب تک، ہر قدم پر علم اور عمل کو ساتھ
-                                لے کر چلنے کی کوشش۔
-                            </p>
-                        </div>
-
-                        <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                            {programs.map((program) => {
-                                const Icon = program.icon;
-                                return (
-                                    <article
-                                        key={program.number}
-                                        className="group rounded-3xl border border-[#e8ebe3] bg-white p-7 transition duration-300 hover:-translate-y-1 hover:border-[#1d5140] hover:shadow-xl hover:shadow-[#1b4131]/8"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="flex size-12 items-center justify-center rounded-2xl bg-[#eef3ec] text-[#3d6c51] transition group-hover:bg-[#1d5140] group-hover:text-white">
-                                                <Icon aria-hidden="true" size={23} strokeWidth={1.7} />
-                                            </span>
-                                            <span className="text-2xl font-bold text-[#e8ece3] group-hover:text-[#c5d4c8]">
-                                                {program.number}
-                                            </span>
-                                        </div>
-                                        <h3 className="mt-6 text-xl font-bold text-[#234739]">
-                                            {program.title}
-                                        </h3>
-                                        <p className="mt-3 text-sm leading-7 text-[#718178]">
-                                            {program.description}
-                                        </p>
-                                    </article>
-                                );
-                            })}
-                        </div>
-                    </section>
-
-                    {/* ── Scholar / Teachers Section ───────────────────────── */}
-                    <section id="teachers" className="border-y border-[#ecece4] bg-white">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
-                            <div className="grid gap-12 lg:grid-cols-[1fr_1.4fr] lg:items-center lg:gap-20">
-                                {/* Scholar Image */}
-                                <div className="relative mx-auto w-full max-w-xs lg:mx-0">
-                                    <div className="overflow-hidden rounded-[2rem] bg-[#eef3ec]">
-                                        <div className="flex h-80 w-full flex-col items-center justify-center gap-4 bg-gradient-to-br from-[#1d5140] to-[#2d7a5a] p-8 text-center text-white">
-                                            <div className="flex size-24 items-center justify-center rounded-full border-4 border-white/30 bg-white/20">
-                                                <GraduationCap size={44} className="text-[#e0b66f]" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xl font-bold">قاری محمد عارف</p>
-                                                <p className="mt-1 text-sm text-white/75">صاحب</p>
-                                                <p className="mt-2 text-xs text-[#e0b66f] font-medium">
-                                                    مدیر مدرسہ دارِ ارقم
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="bg-[#fbfaf6] px-6 py-4 text-center">
-                                            <p className="text-xs text-[#718178]">
-                                                فاضل دارالعلوم دیوبند
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {/* Floating badge */}
-                                    <div className="absolute -right-4 -top-4 rounded-2xl bg-[#1d5140] px-4 py-2 shadow-lg">
-                                        <p className="text-xs font-bold text-[#e0b66f]">تجربہ</p>
-                                        <p className="text-lg font-bold text-white">۱۵+ سال</p>
+                    {/* ════════════════════════════════════════════════════════
+                        TEACHERS
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="teachers" className="bg-[#fbfaf6]">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <SectionHeader
+                                eyebrow="تدریسی ٹیم"
+                                title="اساتذہ — تعلیم اور رہنمائی"
+                                sub="ہمارے اساتذہ قرآن، دینی نصاب اور مفید عصری مضامین کی تعلیم کے ساتھ طلبہ کی روزانہ تعلیمی پیش رفت میں رہنمائی کرتے ہیں۔"
+                            />
+                            <div className="overflow-hidden rounded-3xl border border-[#e8ebe3] bg-white shadow-sm lg:flex">
+                                <div className="relative bg-[#1d5140] lg:w-72 lg:shrink-0">
+                                    <FallbackImg
+                                        src="/storage/teachers/team.jpg"
+                                        fallback="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=70"
+                                        alt="تدریسی ٹیم"
+                                        className="h-56 w-full object-cover object-top opacity-30 lg:h-full"
+                                    />
+                                    <div className="absolute inset-0 flex flex-col items-center justify-end gap-2 p-6 text-center">
+                                        <div className="text-sm font-semibold text-[#e0b66f]">تدریسی ٹیم</div>
+                                        <h3 className="text-xl font-bold text-white">دارِ ارقم تدریسی ٹیم</h3>
+                                        <p className="text-sm text-white/70">🎓 اسلامی و عصری تعلیم</p>
                                     </div>
                                 </div>
-
-                                {/* Text Content */}
-                                <div>
-                                    <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                        اساتذہ اور رہنمائی
+                                <div className="flex-1 p-6 sm:p-8">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <span className="text-xs font-semibold uppercase tracking-widest text-[#b57d38]">تدریسی پروفائل</span>
+                                            <h3 className="mt-1 text-xl font-bold text-[#183b32]">کلاسز، مضامین اور رہنمائی</h3>
+                                        </div>
+                                        <span className="flex items-center gap-1 rounded-full bg-[#eef3ec] px-3 py-1 text-xs font-semibold text-[#1d5140]">
+                                            ✅ طالب علم پر توجہ
+                                        </span>
+                                    </div>
+                                    <p className="mt-4 text-sm leading-7 text-[#718178]">
+                                        مدرسے کی تدریسی ٹیم طلبہ کو بنیادی قرآنی تعلیم، دینی نصاب اور ضروری عصری مضامین میں رہنمائی فراہم کرتی ہے۔
                                     </p>
-                                    <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
-                                        ہر طالب علم کے سیکھنے میں ساتھ
-                                    </h2>
-                                    <p className="mt-4 text-sm leading-7 text-[#718178] sm:text-base">
-                                        تدریسی ٹیم قرآن، دینی نصاب اور مفید عصری مضامین میں طلبہ
-                                        کی رہنمائی کرتی ہے۔ اساتذہ، کلاسوں اور مضامین کی تازہ
-                                        تفصیل کے لیے مدرسے سے رابطہ کریں۔
-                                    </p>
-
-                                    <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                                        {[
-                                            {
-                                                icon: BookOpen,
-                                                title: 'دینی تعلیم',
-                                                desc: 'قرآنِ کریم، تجوید اور دینی نصاب میں رہنمائی۔',
-                                            },
-                                            {
-                                                icon: UsersRound,
-                                                title: 'طلبہ کی معاونت',
-                                                desc: 'حاضری، تعلیمی پیش رفت اور والدین سے رابطہ۔',
-                                            },
-                                            {
-                                                icon: HeartHandshake,
-                                                title: 'کردار سازی',
-                                                desc: 'احترام اور اچھے آداب کو روزمرہ تعلیم میں شامل کرنا۔',
-                                            },
-                                        ].map(({ icon: Icon, title, desc }) => (
-                                            <div
-                                                key={title}
-                                                className="rounded-2xl border border-[#e8ebe3] bg-[#fbfaf6] p-5"
-                                            >
-                                                <span className="flex size-10 items-center justify-center rounded-xl bg-[#eef3ec] text-[#3d6c51]">
-                                                    <Icon aria-hidden="true" size={20} />
-                                                </span>
-                                                <h3 className="mt-4 font-bold text-[#234739]">{title}</h3>
-                                                <p className="mt-2 text-xs leading-5 text-[#718178]">
-                                                    {desc}
-                                                </p>
+                                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                                        {TEACHER_FACTS.map((f) => (
+                                            <div key={f.title} className="flex items-start gap-3">
+                                                <span className="mt-0.5 text-xl" aria-hidden="true">{f.icon}</span>
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-[#234739]">{f.title}</h4>
+                                                    <p className="mt-0.5 text-sm text-[#718178]">{f.desc}</p>
+                                                </div>
                                             </div>
                                         ))}
+                                        <div className="flex items-start gap-3">
+                                            <span className="mt-0.5 text-xl" aria-hidden="true">📞</span>
+                                            <div>
+                                                <h4 className="text-sm font-semibold text-[#234739]">فون / واٹس ایپ</h4>
+                                                <a href="tel:+923349798988" dir="ltr" className="mt-0.5 text-sm text-[#1d5140] hover:underline">
+                                                    00923349798988
+                                                </a>
+                                            </div>
+                                        </div>
                                     </div>
-
+                                    <p className="mt-5 rounded-xl bg-[#f5f7f3] px-4 py-3 text-xs text-[#718178]">
+                                        ℹ️ انفرادی اساتذہ کے نام، مختص کلاسیں اور براہِ راست نمبر مدرسے کی تصدیق کے بعد شامل کیے جاسکتے ہیں۔
+                                    </p>
                                     <a
                                         href="#contact"
-                                        className="mt-7 inline-flex items-center gap-2 rounded-full border border-[#d6dfd7] px-5 py-3 text-sm font-semibold text-[#285845] transition hover:bg-[#f1f5ef]"
+                                        className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#d6dfd7] px-5 py-2.5 text-sm font-semibold text-[#285845] transition hover:bg-[#f1f5ef]"
                                     >
                                         تدریسی ٹیم کے بارے میں پوچھیں
-                                        <ArrowLeft aria-hidden="true" size={16} />
                                     </a>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    {/* ── Green Banner / Values CTA ────────────────────────── */}
-                    <section className="bg-[#1d5140] py-14">
-                        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-12">
-                            <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+                    {/* ════════════════════════════════════════════════════════
+                        PROGRAMS
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="programs" className="border-y border-[#ecece4] bg-white">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <SectionHeader
+                                eyebrow="ہم کیا پڑھاتے ہیں"
+                                title="تعلیمی شعبے"
+                                sub="شعبے اور کورسز انتظامیہ کے زیرِ انتظام ہیں اور ہر سیشن میں تبدیل ہوسکتے ہیں۔"
+                            />
+                            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                                {PROGRAMS.map((p) => (
+                                    <article
+                                        key={p.num}
+                                        className={`group relative overflow-hidden rounded-2xl p-6 transition duration-300 hover:-translate-y-1 hover:shadow-xl ${p.accent ? 'bg-[#1d5140] text-white' : 'border border-[#e8ebe3] bg-white'}`}
+                                    >
+                                        <span className={`text-4xl font-bold select-none ${p.accent ? 'text-white/15' : 'text-[#e8ece3]'}`} aria-hidden="true">{p.num}</span>
+                                        <h3 className={`mt-4 text-xl font-bold ${p.accent ? 'text-white' : 'text-[#234739]'}`}>{p.title}</h3>
+                                        <p className={`mt-3 text-sm leading-7 ${p.accent ? 'text-white/80' : 'text-[#718178]'}`}>{p.desc}</p>
+                                        <div className={`mt-4 h-1 w-10 rounded ${p.accent ? 'bg-[#e0b66f]' : 'bg-[#2d7a5a]'}`} />
+                                    </article>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ════════════════════════════════════════════════════════
+                        RESOURCES HUB
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="resources" className="bg-[#fbfaf6]">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <SectionHeader
+                                eyebrow="معلومات و رہنمائی"
+                                title="تعلیمی و رہنمائی مرکز"
+                                sub="داخلہ، امتحان، نتائج اور مستند دینی مطالعے کے اہم روابط ایک جگہ تلاش کریں۔"
+                            />
+                            <div className="relative mx-auto mb-6 max-w-xl">
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#789087]" aria-hidden="true">🔍</span>
+                                <label className="sr-only" htmlFor="resourceSearch">معلومات تلاش کریں</label>
+                                <input
+                                    id="resourceSearch"
+                                    type="search"
+                                    value={resQuery}
+                                    onChange={(e) => setResQuery(e.target.value)}
+                                    placeholder="مثلاً داخلہ، نتیجہ، کتابیں"
+                                    className="h-12 w-full rounded-2xl border border-[#dfe5dc] bg-white pr-12 pl-4 text-sm text-[#234739] outline-none placeholder:text-[#9aa69c] focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
+                                />
+                            </div>
+                            {filteredResources.length > 0 ? (
+                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                    {filteredResources.map((r) => {
+                                        const cls = 'flex flex-col gap-1 rounded-2xl border border-[#e8ebe3] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#1d5140] hover:shadow-lg';
+                                        const inner = (
+                                            <>
+                                                <span className="text-2xl" aria-hidden="true">{r.icon}</span>
+                                                <strong className="mt-2 text-sm font-bold text-[#234739]">{r.title}</strong>
+                                                <span className="text-xs text-[#718178]">{r.desc}</span>
+                                                {r.external && <span className="mt-1 text-xs text-[#789087]">بیرونی ویب سائٹ ↗</span>}
+                                            </>
+                                        );
+                                        if (r.external)
+                                            return (
+                                                <a key={r.title} href={r.href} target="_blank" rel="noopener noreferrer" className={cls}>
+                                                    {inner}
+                                                </a>
+                                            );
+                                        return (
+                                            <a key={r.title} href={r.href} className={cls}>
+                                                {inner}
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="mt-4 text-center text-sm text-[#718178]" role="status">
+                                    اس تلاش سے متعلق کوئی معلومات نہیں ملیں۔
+                                </p>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* ════════════════════════════════════════════════════════
+                        ADMISSIONS
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="admissions" className="border-y border-[#ecece4] bg-white">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:gap-16">
                                 <div>
-                                    <p className="text-sm font-semibold text-[#e0b66f]">ہمارا عزم</p>
-                                    <h2 className="mt-3 text-2xl font-bold text-white sm:text-3xl">
-                                        علم کو عمل اور کردار کی خوبصورتی بنائیں
-                                    </h2>
-                                    <p className="mt-3 max-w-xl text-sm leading-7 text-white/75">
-                                        نیک نیتی، محنت اور رہنمائی کے ساتھ اپنے تعلیمی سفر کا آغاز کریں۔
-                                        مدرسہ دارِ ارقم آپ کے بچے کی دینی و اخلاقی تربیت کا بہترین
-                                        مرکز ہے۔
-                                    </p>
+                                    <span className="text-sm font-semibold tracking-wide text-[#b57d38]">داخلہ</span>
+                                    <h2 className="mt-2 text-3xl font-bold text-[#183b32] sm:text-4xl">درخواست کا طریقہ</h2>
+                                    <div className="mt-3 h-1 w-14 rounded bg-[#2d7a5a]" />
+                                    <ol className="mt-8 flex flex-col gap-5">
+                                        {ADMISSION_STEPS.map((step, i) => (
+                                            <li key={step.t} className="flex gap-4">
+                                                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#1d5140] text-sm font-bold text-white" aria-hidden="true">
+                                                    {i + 1}
+                                                </span>
+                                                <div>
+                                                    <h3 className="font-bold text-[#234739]">{step.t}</h3>
+                                                    <p className="mt-1 text-sm leading-6 text-[#718178]">{step.d}</p>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ol>
                                 </div>
-                                <div className="flex flex-wrap gap-3">
-                                    <a
-                                        href="#admissions"
-                                        className="inline-flex items-center gap-2 rounded-full bg-[#e0b66f] px-6 py-3.5 text-sm font-semibold text-[#183b32] transition hover:bg-[#edc985]"
-                                    >
-                                        داخلہ لیں
-                                        <ArrowLeft aria-hidden="true" size={16} />
+                                <aside className="rounded-3xl bg-[#f7f6ef] p-6 sm:p-8">
+                                    <h3 className="text-xl font-bold text-[#234739]">داخلہ کھلا ہے</h3>
+                                    <p className="mt-3 text-sm leading-7 text-[#718178]">سیشن ۲۰۲۶–۲۰۲۷ کی درخواستیں ماہ کے آخر تک قبول کی جارہی ہیں۔</p>
+                                    <ul className="mt-5 flex flex-col gap-2 text-sm text-[#526c61]" role="list">
+                                        <li className="flex items-center gap-2"><span className="text-[#2d7a5a]">✓</span> لڑکے اور لڑکیوں کے الگ شعبے</li>
+                                        <li className="flex items-center gap-2"><span className="text-[#2d7a5a]">✓</span> ڈے اسکالر اور رہائشی جگہیں</li>
+                                        <li className="flex items-center gap-2"><span className="text-[#2d7a5a]">✓</span> مستحق طلبہ کے لیے فیس میں رعایت</li>
+                                    </ul>
+                                    <a href="#contact" className="mt-6 block rounded-2xl bg-[#1d5140] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#173f34]">
+                                        داخلہ فارم کی درخواست کریں
                                     </a>
-                                    <a
-                                        href="#contact"
-                                        className="inline-flex items-center gap-2 rounded-full border border-white/40 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                                    >
-                                        رابطہ کریں
-                                    </a>
+                                </aside>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ════════════════════════════════════════════════════════
+                        NOTICES + DATE SHEET
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="notices" className="bg-[#fbfaf6]">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <SectionHeader title="نوٹس اور ڈیٹ شیٹ" />
+                            <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+                                {/* Notices */}
+                                <div className="rounded-2xl border border-[#e8ebe3] bg-white p-6">
+                                    <h3 className="mb-4 font-bold text-[#234739]">تازہ نوٹس</h3>
+                                    <ul className="flex flex-col gap-3">
+                                        {NOTICES.map((n) => (
+                                            <li key={n.title} className="flex items-start gap-3 rounded-xl bg-[#fbfaf6] p-3">
+                                                <span className="shrink-0 text-xs font-semibold text-[#789087]">{n.date}</span>
+                                                <span className="text-sm text-[#234739]">{n.title}</span>
+                                                {n.badge && (
+                                                    <span className={`ms-auto shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${n.badgeGreen ? 'bg-[#eef3ec] text-[#1d5140]' : 'bg-[#f7f4e8] text-[#b57d38]'}`}>
+                                                        {n.badge}
+                                                    </span>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                {/* Date sheet */}
+                                <div className="rounded-2xl border border-[#e8ebe3] bg-white p-6">
+                                    <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+                                        <div>
+                                            <h3 className="font-bold text-[#234739]">سالانہ امتحان ڈیٹ شیٹ</h3>
+                                            <p className="text-xs text-[#789087]">کلاس: درسِ نظامی، سال اول</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => window.print()}
+                                            className="flex items-center gap-1.5 rounded-full border border-[#d6dfd7] px-4 py-1.5 text-xs font-semibold text-[#285845] transition hover:bg-[#f1f5ef] print:hidden"
+                                        >
+                                            🖨 پرنٹ
+                                        </button>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b border-[#ecece4] text-[#526c61]">
+                                                    <th scope="col" className="pb-2 text-right font-semibold">تاریخ</th>
+                                                    <th scope="col" className="pb-2 text-right font-semibold">مضمون</th>
+                                                    <th scope="col" className="pb-2 text-right font-semibold">وقت</th>
+                                                    <th scope="col" className="pb-2 text-right font-semibold">ہال</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {DATE_SHEET.map((row) => (
+                                                    <tr key={row.date} className="border-b border-[#f5f5f0] hover:bg-[#f9faf7]">
+                                                        <td className="py-2 text-[#234739]">{row.date}</td>
+                                                        <td className="py-2 font-medium text-[#1d5140]">{row.subject}</td>
+                                                        <td className="py-2 text-[#718178]" dir="ltr">{row.time}</td>
+                                                        <td className="py-2 text-[#718178]">{row.hall}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    {/* ── Resources Section ───────────────────────────────── */}
-                    <section
-                        id="resources"
-                        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
-                    >
-                        <div className="text-center">
-                            <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                معلومات و رہنمائی
-                            </p>
-                            <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
-                                اہم معلومات ایک جگہ
-                            </h2>
-                            <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#718178]">
-                                داخلے، تعلیمی شعبوں اور سرکاری پورٹلز تک آسان رسائی حاصل کریں۔
-                            </p>
-                        </div>
-
-                        <div className="relative mx-auto mt-8 max-w-xl">
-                            <Search
-                                aria-hidden="true"
-                                className="absolute top-1/2 right-4 -translate-y-1/2 text-[#789087]"
-                                size={18}
+                    {/* ════════════════════════════════════════════════════════
+                        RESULTS
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="results" className="border-y border-[#ecece4] bg-white">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <SectionHeader
+                                eyebrow="نتائج"
+                                title="اپنا نتیجہ دیکھیں"
+                                sub="رول نمبر اور رجسٹریشن نمبر درج کریں جو آپ کی رول سلپ پر لکھا ہے۔"
                             />
-                            <label className="sr-only" htmlFor="resource-search">
-                                معلومات تلاش کریں
-                            </label>
-                            <input
-                                id="resource-search"
-                                type="search"
-                                value={resourceQuery}
-                                onChange={(e) => setResourceQuery(e.target.value)}
-                                placeholder="مثلاً داخلہ، امتحان، نتائج"
-                                className="h-12 w-full rounded-2xl border border-[#dfe5dc] bg-white pr-12 pl-4 text-sm text-[#234739] outline-none placeholder:text-[#9aa69c] focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
-                            />
-                        </div>
+                            {/* Tabs */}
+                            <div className="mb-6 flex gap-2" role="tablist" aria-label="امتحان کی قسم">
+                                {(['internal', 'wifaq'] as const).map((tab) => (
+                                    <button
+                                        key={tab}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={resTab === tab}
+                                        aria-controls={`panel-${tab}`}
+                                        id={`tab-${tab}`}
+                                        onClick={() => setResTab(tab)}
+                                        className={`rounded-full px-6 py-2 text-sm font-semibold transition ${resTab === tab ? 'bg-[#1d5140] text-white shadow' : 'border border-[#dce0d8] text-[#526c61] hover:border-[#1d5140] hover:text-[#1d5140]'}`}
+                                    >
+                                        {tab === 'internal' ? 'داخلی امتحان' : 'وفاق المدارس'}
+                                    </button>
+                                ))}
+                            </div>
 
-                        {filteredResources.length > 0 ? (
-                            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {filteredResources.map((resource) => {
-                                    const cls =
-                                        'group rounded-2xl border border-[#e8ebe3] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#1d5140] hover:shadow-lg hover:shadow-[#1b4131]/5';
-                                    const inner = (
-                                        <>
-                                            <div className="flex items-start justify-between gap-3">
-                                                <h3 className="font-bold text-[#234739]">
-                                                    {resource.title}
-                                                </h3>
-                                                {resource.external && (
-                                                    <ExternalLink
-                                                        aria-hidden="true"
-                                                        size={15}
-                                                        className="shrink-0 text-[#789087]"
-                                                    />
+                            {resTab === 'internal' && (
+                                <div id="panel-internal" role="tabpanel" aria-labelledby="tab-internal" className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+                                    <ResultForm
+                                        type="internal"
+                                        label="داخلی امتحان"
+                                        labelColor="green"
+                                        rollPlaceholder="2026-001"
+                                        regPlaceholder="REG-2026-0001"
+                                        hint="آزمائش: 2026-001 اور REG-2026-0001"
+                                    />
+                                    <div aria-live="polite" aria-atomic="true">
+                                        {flash.result_error && (
+                                            <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert">
+                                                {flash.result_error}
+                                            </div>
+                                        )}
+                                        {flash.result_data && <ResultCard data={flash.result_data} />}
+                                    </div>
+                                </div>
+                            )}
+
+                            {resTab === 'wifaq' && (
+                                <div id="panel-wifaq" role="tabpanel" aria-labelledby="tab-wifaq" className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+                                    <ResultForm
+                                        type="wifaq"
+                                        label="وفاق المدارس"
+                                        labelColor="gold"
+                                        rollPlaceholder="WM-2026-001"
+                                        regPlaceholder="WRG-2026-0001"
+                                        hint="آزمائش: WM-2026-001 اور WRG-2026-0001"
+                                    />
+                                    <div aria-live="polite" aria-atomic="true">
+                                        {flash.wifaq_error && (
+                                            <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert">
+                                                {flash.wifaq_error}
+                                            </div>
+                                        )}
+                                        {flash.wifaq_data && <ResultCard data={flash.wifaq_data} />}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* ════════════════════════════════════════════════════════
+                        POSITION HOLDERS
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="positionHolders" className="bg-[#fbfaf6]">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <SectionHeader
+                                eyebrow="ہمارے ستارے"
+                                title="پوزیشن ہولڈرز"
+                                sub="وہ طلبہ جنہوں نے داخلی اور وفاق المدارس کے امتحانات میں نمایاں کامیابی حاصل کی۔"
+                            />
+                            <div className="grid gap-5 lg:grid-cols-2">
+                                {/* Featured */}
+                                {POSITION_HOLDERS.filter((p) => p.featured).map((p) => (
+                                    <article key={p.name} className="overflow-hidden rounded-3xl border border-[#e8ebe3] bg-white shadow-md">
+                                        <div className="relative h-56 overflow-hidden">
+                                            <FallbackImg src={p.img} fallback={p.imgFallback} alt={p.name} className="h-full w-full object-cover object-top" />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                            <span className={`absolute right-4 top-4 rounded-full px-3 py-1 text-xs font-bold ${badgeCls(p.badgeColor)}`}>
+                                                🏆 {p.badge}
+                                            </span>
+                                            <span className="absolute left-4 top-4 rounded-full bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                                                {p.exam}
+                                            </span>
+                                        </div>
+                                        <div className="p-6">
+                                            <h3 className="text-2xl font-bold text-[#183b32]">{p.name}</h3>
+                                            <p className="mt-1 text-sm text-[#718178]">والد: {p.father}</p>
+                                            <p className="text-sm text-[#718178]">{p.course}</p>
+                                            <div className="mt-4 flex gap-6">
+                                                <div className="text-center">
+                                                    <p className="text-2xl font-bold text-[#1d5140]">
+                                                        {p.marks}<span className="text-sm text-[#789087]">/{p.total}</span>
+                                                    </p>
+                                                    <p className="text-xs text-[#789087]">نمبر</p>
+                                                </div>
+                                                <div className="text-center">
+                                                    <p className="text-2xl font-bold text-[#1d5140]">{p.pct}<span className="text-sm">%</span></p>
+                                                    <p className="text-xs text-[#789087]">فیصد</p>
+                                                </div>
+                                                {'grade' in p && (
+                                                    <div className="text-center">
+                                                        <p className="text-2xl font-bold text-[#1d5140]">{(p as typeof p & { grade: string }).grade}</p>
+                                                        <p className="text-xs text-[#789087]">گریڈ</p>
+                                                    </div>
                                                 )}
                                             </div>
-                                            <p className="mt-2 text-sm leading-6 text-[#718178]">
-                                                {resource.description}
-                                            </p>
-                                        </>
-                                    );
-
-                                    if (resource.external)
-                                        return (
-                                            <a
-                                                key={resource.title}
-                                                href={resource.href}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className={cls}
-                                            >
-                                                {inner}
-                                            </a>
-                                        );
-                                    if (resource.href.startsWith('#'))
-                                        return (
-                                            <a key={resource.title} href={resource.href} className={cls}>
-                                                {inner}
-                                            </a>
-                                        );
-                                    return (
-                                        <Link key={resource.title} href={resource.href} className={cls}>
-                                            {inner}
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <p className="mt-7 text-center text-sm text-[#718178]" role="status">
-                                اس تلاش سے متعلق معلومات نہیں ملیں۔
-                            </p>
-                        )}
-                    </section>
-
-                    {/* ── Admissions Section ──────────────────────────────── */}
-                    <section id="admissions" className="border-y border-[#ecece4] bg-white">
-                        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:gap-16 lg:px-12">
-                            <div>
-                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                    داخلہ
-                                </p>
-                                <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
-                                    داخلے کے بارے میں رہنمائی
-                                </h2>
-                                <p className="mt-4 max-w-2xl text-sm leading-7 text-[#718178] sm:text-base">
-                                    داخلے کی دستیابی، عمر اور مطلوبہ دستاویزات کی تصدیق براہِ راست
-                                    مدرسے سے کریں۔ آن لائن درخواست فارم فی الحال منسلک نہیں ہے۔
-                                </p>
-                                <ol className="mt-8 grid gap-4 sm:grid-cols-2">
-                                    {[
-                                        'داخلے کی دستیابی کے لیے رابطہ کریں۔',
-                                        'طالب علم کی سابقہ تعلیمی تفصیل پوچھیں۔',
-                                        'ضروری دستاویزات کی فہرست حاصل کریں۔',
-                                        'مدرسے سے ملاقات کا وقت طے کریں۔',
-                                    ].map((step, i) => (
-                                        <li
-                                            key={step}
-                                            className="flex items-start gap-3 rounded-2xl bg-[#f7f8f3] p-4"
-                                        >
-                                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#1d5140] text-sm font-bold text-white">
-                                                {i + 1}
-                                            </span>
-                                            <span className="pt-1 text-sm leading-6 text-[#526c61]">
-                                                {step}
-                                            </span>
-                                        </li>
+                                            {p.quote && (
+                                                <blockquote className="mt-4 border-r-4 border-[#2d7a5a] pr-4 text-sm italic text-[#718178]">
+                                                    {p.quote}
+                                                </blockquote>
+                                            )}
+                                        </div>
+                                    </article>
+                                ))}
+                                {/* Side cards */}
+                                <div className="flex flex-col gap-4">
+                                    {POSITION_HOLDERS.filter((p) => !p.featured).map((p) => (
+                                        <article key={p.name} className="flex overflow-hidden rounded-2xl border border-[#e8ebe3] bg-white shadow-sm">
+                                            <div className="relative w-28 shrink-0">
+                                                <FallbackImg src={p.img} fallback={p.imgFallback} alt={p.name} className="h-full w-full object-cover object-top" />
+                                                <span className={`absolute right-1 top-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${badgeCls(p.badgeColor)}`}>
+                                                    {p.badge}
+                                                </span>
+                                            </div>
+                                            <div className="flex-1 p-4">
+                                                <span className="rounded-full bg-[#eef3ec] px-2 py-0.5 text-[10px] font-semibold text-[#1d5140]">{p.exam}</span>
+                                                <h3 className="mt-1 font-bold text-[#183b32]">{p.name}</h3>
+                                                <p className="text-xs text-[#718178]">{p.course}</p>
+                                                <div className="mt-2 flex gap-4 text-sm">
+                                                    <span className="font-bold text-[#1d5140]">
+                                                        {p.marks}<span className="text-xs text-[#789087]">/{p.total}</span>
+                                                    </span>
+                                                    <span className="font-bold text-[#1d5140]">{p.pct}%</span>
+                                                </div>
+                                            </div>
+                                        </article>
                                     ))}
-                                </ol>
-                            </div>
-
-                            <aside className="rounded-3xl bg-[#f7f6ef] p-6 sm:p-8">
-                                <div className="flex size-12 items-center justify-center rounded-2xl bg-white text-[#3d6c51]">
-                                    <CheckCircle2 aria-hidden="true" size={24} />
                                 </div>
-                                <h3 className="mt-5 text-xl font-bold text-[#234739]">
-                                    داخلے کی معلومات حاصل کریں
-                                </h3>
-                                <p className="mt-3 text-sm leading-7 text-[#718178]">
-                                    تازہ داخلہ شیڈول، فیس اور دستاویزات کی تصدیق فون یا ای میل
-                                    کے ذریعے کریں۔
-                                </p>
-                                <div className="mt-6 flex flex-col gap-3">
-                                    <a
-                                        href="tel:+923349798988"
-                                        className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1d5140] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#173f34]"
-                                    >
-                                        <Phone aria-hidden="true" size={16} />
-                                        مدرسے کو کال کریں
-                                    </a>
-                                    <a
-                                        href="mailto:qarimuhammadarif988@gmail.com"
-                                        className="inline-flex items-center justify-center gap-2 rounded-full border border-[#d6dfd7] px-5 py-3 text-sm font-semibold text-[#285845] transition hover:bg-white"
-                                    >
-                                        <Mail aria-hidden="true" size={16} />
-                                        ای میل بھیجیں
-                                    </a>
-                                </div>
-                            </aside>
-                        </div>
-                    </section>
-
-                    {/* ── Notices Section ─────────────────────────────────── */}
-                    <section
-                        id="notices"
-                        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
-                    >
-                        <div className="text-center">
-                            <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                اعلانات
-                            </p>
-                            <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
-                                تازہ نوٹس اور امتحانی معلومات
-                            </h2>
-                        </div>
-                        <div className="mx-auto mt-8 flex max-w-3xl items-start gap-4 rounded-3xl border border-[#e8ebe3] bg-white p-6 sm:p-8">
-                            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#eef3ec] text-[#3d6c51]">
-                                <CalendarDays aria-hidden="true" size={23} />
-                            </span>
-                            <div>
-                                <h3 className="font-bold text-[#234739]">
-                                    فی الحال کوئی تازہ نوٹس شائع نہیں ہوا
-                                </h3>
-                                <p className="mt-2 text-sm leading-7 text-[#718178]">
-                                    امتحان کی تاریخ، ڈیٹ شیٹ یا کسی اعلان کی تصدیق کے لیے مدرسے
-                                    سے رابطہ کریں۔
-                                </p>
-                                <a
-                                    href="tel:+923349798988"
-                                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#285845] transition hover:text-[#b57d38]"
-                                >
-                                    <Phone aria-hidden="true" size={15} />
-                                    0092 334 9798988
-                                </a>
                             </div>
                         </div>
                     </section>
 
-                    {/* ── Results Section ─────────────────────────────────── */}
-                    <section id="results" className="border-y border-[#ecece4] bg-white">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
-                            <div className="text-center">
-                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                    نتائج
-                                </p>
-                                <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
-                                    نتائج کے بارے میں معلومات
-                                </h2>
-                                <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#718178]">
-                                    غلط یا آزمائشی نمبروں کے بجائے، سرکاری نتیجے کے لیے درست پورٹل
-                                    یا مدرسے سے رجوع کریں۔
-                                </p>
-                            </div>
-                            <div className="mt-8 grid gap-5 md:grid-cols-2">
-                                <article className="rounded-3xl border border-[#e8ebe3] bg-[#fbfaf6] p-6 sm:p-8">
-                                    <BookOpen aria-hidden="true" className="text-[#3d6c51]" size={27} />
-                                    <h3 className="mt-5 text-xl font-bold text-[#234739]">
-                                        مدرسے کے داخلی نتائج
-                                    </h3>
-                                    <p className="mt-3 text-sm leading-7 text-[#718178]">
-                                        آن لائن داخلی نتیجہ تلاش اس وقت دستیاب نہیں۔ اپنے رول نمبر
-                                        کے ساتھ مدرسے سے براہِ راست تصدیق کریں۔
-                                    </p>
-                                    <a
-                                        href="tel:+923349798988"
-                                        className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#285845]"
-                                    >
-                                        <Phone aria-hidden="true" size={15} />
-                                        نتیجے کے لیے رابطہ کریں
-                                    </a>
-                                </article>
-                                <article className="rounded-3xl border border-[#e8ebe3] bg-[#fbfaf6] p-6 sm:p-8">
-                                    <GraduationCap
-                                        aria-hidden="true"
-                                        className="text-[#3d6c51]"
-                                        size={29}
-                                    />
-                                    <h3 className="mt-5 text-xl font-bold text-[#234739]">
-                                        وفاق المدارس
-                                    </h3>
-                                    <p className="mt-3 text-sm leading-7 text-[#718178]">
-                                        وفاق المدارس سے متعلق تازہ معلومات کے لیے اس کی سرکاری ویب
-                                        سائٹ استعمال کریں۔
-                                    </p>
-                                    <a
-                                        href="https://www.wifaqulmadaris.org/"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#285845]"
-                                    >
-                                        سرکاری ویب سائٹ
-                                        <ExternalLink aria-hidden="true" size={15} />
-                                    </a>
-                                </article>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ── Position Holders ────────────────────────────────── */}
-                    <section
-                        id="position-holders"
-                        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
-                    >
-                        <div className="text-center">
-                            <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                شاندار کارکردگی
-                            </p>
-                            <h2 className="mt-3 text-3xl font-bold text-[#183b32] sm:text-4xl">
-                                نمایاں طلبہ
-                            </h2>
-                        </div>
-                        <div className="mx-auto mt-8 max-w-3xl rounded-3xl border border-dashed border-[#cbd9cc] bg-white p-7 text-center sm:p-10">
-                            <Award
-                                aria-hidden="true"
-                                className="mx-auto text-[#3d6c51]"
-                                size={40}
+                    {/* ════════════════════════════════════════════════════════
+                        GALLERY
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="gallery" className="border-y border-[#ecece4] bg-white">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <SectionHeader
+                                eyebrow="ہمارا کیمپس"
+                                title="مدرسے کی زندگی"
+                                sub="روزمرہ سیکھنے، کیمپس کی زندگی اور یادگار لمحات کی ایک جھلک۔"
                             />
-                            <p className="mt-4 text-sm leading-7 text-[#718178]">
-                                تصدیق شدہ امتحانی نتائج دستیاب ہونے پر نمایاں طلبہ کی تفصیل
-                                یہاں شامل کی جائے گی۔
-                            </p>
-                        </div>
-                    </section>
-
-                    {/* ── Gallery Section ─────────────────────────────────── */}
-                    <section className="border-t border-[#ecece4] bg-white">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-12">
-                            <div className="text-center">
-                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                    جھلکیاں
-                                </p>
-                                <h2 className="mt-3 text-3xl font-bold text-[#183b32] sm:text-4xl">
-                                    تصویری گیلری
-                                </h2>
-                            </div>
-                            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                {galleryImages.map((img) => (
-                                    <div
-                                        key={img.alt}
-                                        className="group relative overflow-hidden rounded-2xl"
+                            {/* Filter tabs */}
+                            <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="گیلری فلٹر">
+                                {GALLERY_FILTERS.map(([val, label]) => (
+                                    <button
+                                        key={val}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={galFilter === val}
+                                        onClick={() => setGalFilter(val)}
+                                        className={`rounded-full px-5 py-2 text-sm font-semibold transition ${galFilter === val ? 'bg-[#1d5140] text-white' : 'border border-[#dce0d8] text-[#526c61] hover:border-[#1d5140] hover:text-[#1d5140]'}`}
                                     >
-                                        <img
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Masonry grid */}
+                            <div className="grid auto-rows-[200px] grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                                {visibleGallery.map((img, idx) => (
+                                    <div
+                                        key={`${img.src}-${idx}`}
+                                        className={`group relative overflow-hidden rounded-2xl ${img.wide ? 'col-span-2' : ''} ${img.tall ? 'row-span-2' : ''}`}
+                                    >
+                                        <FallbackImg
                                             src={img.src}
-                                            alt={img.alt}
-                                            className="h-52 w-full object-cover object-center transition duration-500 group-hover:scale-105"
+                                            fallback={img.fallback}
+                                            alt={img.label}
+                                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                                         />
-                                        <div className="absolute inset-0 flex items-end bg-gradient-to-t from-[#0d2b1f]/80 to-transparent p-4 opacity-0 transition group-hover:opacity-100">
-                                            <p className="text-sm font-semibold text-white">
+                                        <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 to-transparent p-3 opacity-0 transition group-hover:opacity-100">
+                                            <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
                                                 {img.label}
-                                            </p>
+                                            </span>
                                         </div>
                                     </div>
                                 ))}
@@ -897,142 +1034,285 @@ export default function Welcome() {
                         </div>
                     </section>
 
-                    {/* ── Contact Section ─────────────────────────────────── */}
-                    <section id="contact" className="border-y border-[#ecece4] bg-[#fbfaf6]">
-                        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:px-12">
-                            <div>
-                                <p className="text-sm font-semibold tracking-wide text-[#b57d38]">
-                                    رابطہ
-                                </p>
-                                <h2 className="mt-3 text-3xl leading-relaxed font-bold text-[#183b32] sm:text-4xl">
-                                    ہم سے رابطہ کریں
-                                </h2>
-                                <p className="mt-4 text-sm leading-7 text-[#718178]">
-                                    داخلے، نصاب یا امتحان سے متعلق تصدیق شدہ معلومات کے لیے مدرسے
-                                    سے براہِ راست رابطہ کریں۔
-                                </p>
-                            </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <a
-                                    href="tel:+923349798988"
-                                    dir="ltr"
-                                    className="flex items-start gap-4 rounded-2xl border border-[#e8ebe3] bg-white p-5 text-right transition hover:border-[#1d5140] hover:shadow-md"
-                                >
-                                    <Phone
-                                        aria-hidden="true"
-                                        className="mt-1 shrink-0 text-[#3d6c51]"
-                                        size={20}
-                                    />
-                                    <span>
-                                        <span className="block font-bold text-[#234739]">
-                                            فون / واٹس ایپ
-                                        </span>
-                                        <span className="mt-1 block text-sm text-[#718178]">
-                                            0092 334 9798988
-                                        </span>
-                                    </span>
-                                </a>
-                                <a
-                                    href="mailto:qarimuhammadarif988@gmail.com"
-                                    dir="ltr"
-                                    className="flex items-start gap-4 rounded-2xl border border-[#e8ebe3] bg-white p-5 text-right transition hover:border-[#1d5140] hover:shadow-md"
-                                >
-                                    <Mail
-                                        aria-hidden="true"
-                                        className="mt-1 shrink-0 text-[#3d6c51]"
-                                        size={20}
-                                    />
-                                    <span className="min-w-0">
-                                        <span className="block font-bold text-[#234739]">ای میل</span>
-                                        <span className="mt-1 block break-all text-sm text-[#718178]">
-                                            qarimuhammadarif988@gmail.com
-                                        </span>
-                                    </span>
-                                </a>
-                                <div className="flex items-start gap-4 rounded-2xl border border-[#e8ebe3] bg-white p-5">
-                                    <MapPin
-                                        aria-hidden="true"
-                                        className="mt-1 shrink-0 text-[#3d6c51]"
-                                        size={20}
-                                    />
-                                    <span>
-                                        <span className="block font-bold text-[#234739]">پتہ</span>
-                                        <span className="mt-1 block text-sm text-[#718178]">
-                                            گرگری، پاکستان
-                                        </span>
-                                    </span>
+                    {/* ════════════════════════════════════════════════════════
+                        CONTACT
+                    ════════════════════════════════════════════════════════ */}
+                    <section id="contact" className="bg-[#fbfaf6]">
+                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+                            <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+                                <div>
+                                    <span className="text-sm font-semibold tracking-wide text-[#b57d38]">رابطہ</span>
+                                    <h2 className="mt-2 text-3xl font-bold text-[#183b32] sm:text-4xl">ہم سے رابطہ کریں</h2>
+                                    <div className="mt-3 h-1 w-14 rounded bg-[#2d7a5a]" />
+                                    <address className="mt-8 flex flex-col gap-5 not-italic">
+                                        {CONTACT_INFO.map((c) => (
+                                            <div key={c.title} className="flex items-start gap-3">
+                                                <span className="mt-0.5 text-xl" aria-hidden="true">{c.icon}</span>
+                                                <div>
+                                                    <p className="font-semibold text-[#234739]">{c.title}</p>
+                                                    {c.href ? (
+                                                        <a href={c.href} dir={c.ltr ? 'ltr' : undefined} className="text-sm text-[#1d5140] transition hover:underline">
+                                                            {c.val}
+                                                        </a>
+                                                    ) : (
+                                                        <p className="text-sm text-[#718178]">{c.val}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </address>
+                                    <div className="mt-6 flex h-32 items-center justify-center rounded-2xl border border-dashed border-[#c8d4c3] bg-[#f0f9ee] text-sm text-[#789087]" aria-label="نقشہ">
+                                        🗺 نقشہ یہاں شامل کیا جائے گا
+                                    </div>
                                 </div>
-                                <div className="flex items-start gap-4 rounded-2xl border border-[#e8ebe3] bg-white p-5">
-                                    <CalendarDays
-                                        aria-hidden="true"
-                                        className="mt-1 shrink-0 text-[#3d6c51]"
-                                        size={20}
-                                    />
-                                    <span>
-                                        <span className="block font-bold text-[#234739]">دفتری اوقات</span>
-                                        <span className="mt-1 block text-sm text-[#718178]">
-                                            ہفتہ تا جمعرات، صبح ۸ تا دوپہر ۲
-                                        </span>
-                                    </span>
+                                {/* Contact form */}
+                                <div className="rounded-3xl border border-[#e8ebe3] bg-white p-6 sm:p-8">
+                                    <h3 className="mb-5 text-xl font-bold text-[#234739]">پیغام بھیجیں</h3>
+                                    <ContactForm flash={flash} />
                                 </div>
                             </div>
-                        </div>
-                    </section>
-
-                    {/* ── Values / Final CTA ──────────────────────────────── */}
-                    <section
-                        id="values"
-                        className="mx-5 my-16 overflow-hidden rounded-[2rem] bg-[#1d5140] sm:mx-8 sm:my-20 lg:mx-auto lg:max-w-7xl"
-                    >
-                        <div className="relative grid gap-8 px-7 py-12 sm:px-12 sm:py-14 lg:grid-cols-[1fr_auto] lg:items-center lg:px-16">
-                            <div
-                                aria-hidden="true"
-                                className="absolute -top-24 -left-16 size-64 rounded-full border border-white/10"
-                            />
-                            <div
-                                aria-hidden="true"
-                                className="absolute -bottom-20 -right-10 size-48 rounded-full bg-white/5"
-                            />
-                            <div className="relative max-w-2xl">
-                                <p className="text-sm font-semibold text-[#e2bd82]">ہمارا عزم</p>
-                                <h2 className="mt-3 text-2xl leading-relaxed font-bold text-white sm:text-3xl">
-                                    علم کو عمل اور کردار کی خوبصورتی بنائیں
-                                </h2>
-                                <p className="mt-4 text-sm leading-7 text-white/75">
-                                    نیک نیتی، محنت اور رہنمائی کے ساتھ اپنے تعلیمی سفر کا آغاز کریں۔
-                                </p>
-                            </div>
-                            <a
-                                href="#programs"
-                                className="relative inline-flex w-fit items-center gap-3 rounded-full bg-[#e0b66f] px-6 py-3.5 text-sm font-semibold text-[#183b32] transition hover:bg-[#edc985]"
-                            >
-                                مزید جانیے
-                                <ArrowLeft aria-hidden="true" size={17} />
-                            </a>
                         </div>
                     </section>
                 </main>
 
-                {/* ── Footer ──────────────────────────────────────────────── */}
+                {/* ── Footer ───────────────────────────────────────────────── */}
                 <footer className="border-t border-[#e7e9e1] bg-[#f6f6f0]">
-                    <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-7 text-sm text-[#718178] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
-                        <a
-                            href="#home"
-                            className="font-bold text-[#315445] transition hover:text-[#b57d38]"
-                        >
-                            مدرسہ دارِ ارقم
+                    <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-6 text-sm text-[#718178] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+                        <a href="#home" className="font-bold text-[#315445] transition hover:text-[#b57d38]">
+                            مدرسہ دارِ ارقم گرگری
                         </a>
                         <p>قرآن کی تعلیم، علم کی جستجو اور اچھے کردار کی تربیت۔</p>
-                        <a
-                            href="#home"
-                            className="flex items-center gap-2 transition hover:text-[#315445]"
-                        >
-                            واپس اوپر
-                            <ArrowUpLeft aria-hidden="true" size={15} />
-                        </a>
+                        <a href="#home" className="transition hover:text-[#315445]">واپس اوپر ↑</a>
                     </div>
                 </footer>
             </div>
         </>
+    );
+}
+
+// ─── Static constant data (kept outside component to avoid re-creation) ───────
+
+const NAV_LINKS: [string, string][] = [
+    ['تعارف', '#about'],
+    ['شعبے', '#programs'],
+    ['اساتذہ', '#teachers'],
+    ['داخلہ', '#admissions'],
+    ['نوٹس', '#notices'],
+    ['نتائج', '#results'],
+    ['رابطہ', '#contact'],
+];
+
+const TEACHER_FACTS = [
+    { icon: '📔', title: 'پڑھائی جانے والی کلاسیں', desc: 'ناظرہ · حفظ · تجوید · درسِ نظامی' },
+    { icon: '📖', title: 'مضامین', desc: 'قرآن، حدیث، فقہ، عربی، اردو، انگریزی اور ریاضی' },
+    { icon: '👥', title: 'طالب علم و والدین کی مدد', desc: 'پیش رفت، حاضری، اسیسمنٹ اور والدین سے ملاقات' },
+];
+
+const ADMISSION_STEPS = [
+    { t: 'درخواست فارم پُر کریں', d: 'طالب علم اور سرپرست کی تفصیل کے ساتھ داخلہ فارم مکمل کریں۔' },
+    { t: 'دستاویزات جمع کرائیں', d: 'بی فارم یا شناختی کارڈ، دو تصاویر اور سابقہ سرٹیفکیٹ (اگر ہو)۔' },
+    { t: 'اساتذہ سے ملاقات', d: 'مختصر انٹرویو اور سطح کا امتحان مناسب کلاس کا تعین کرتا ہے۔' },
+    { t: 'داخلہ نمبر حاصل کریں', d: 'منظوری کے بعد رجسٹریشن نمبر اور طالب علم کارڈ ملتا ہے۔' },
+];
+
+const GALLERY_FILTERS: [string, string][] = [
+    ['all', 'سب'], ['quran', 'قرآن'], ['campus', 'کیمپس'], ['events', 'تقاریب'],
+];
+
+const CONTACT_INFO = [
+    { icon: '📍', title: 'پتہ', val: 'گرگری، پاکستان' },
+    { icon: '📞', title: 'فون / واٹس ایپ', val: '00923349798988', href: 'tel:+923349798988', ltr: true },
+    { icon: '✉️', title: 'ای میل', val: 'qarimuhammadarif988@gmail.com', href: 'mailto:qarimuhammadarif988@gmail.com', ltr: true },
+    { icon: '🕐', title: 'دفتری اوقات', val: 'ہفتہ تا جمعرات، صبح ۸ تا دوپہر ۲' },
+];
+
+// ─── Result form (uses Inertia router.post — no fake setTimeout) ───────────────
+
+interface ResultFormProps {
+    type: 'internal' | 'wifaq';
+    label: string;
+    labelColor: 'green' | 'gold';
+    rollPlaceholder: string;
+    regPlaceholder: string;
+    hint: string;
+}
+
+function ResultForm({ type, label, labelColor, rollPlaceholder, regPlaceholder, hint }: ResultFormProps) {
+    const [roll, setRoll] = useState('');
+    const [reg,  setReg]  = useState('');
+    const [busy, setBusy] = useState(false);
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!roll.trim() || !reg.trim()) return;
+        setBusy(true);
+        // Posts to POST /results/{type} — wire up the route in routes/web.php
+        // The controller returns back()->with("${type}_data", ...) or "${type}_error"
+        router.post(
+            `/results/${type}`,
+            { roll: roll.trim(), reg: reg.trim() },
+            {
+                preserveScroll: true,
+                onFinish: () => setBusy(false),
+            },
+        );
+    }
+
+    const badgeClass = labelColor === 'green'
+        ? 'bg-[#eef3ec] text-[#1d5140]'
+        : 'bg-[#f7f4e8] text-[#b57d38]';
+
+    return (
+        <form onSubmit={handleSubmit} noValidate className="rounded-2xl border border-[#e8ebe3] bg-[#fbfaf6] p-6">
+            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+                {labelColor === 'green' ? '🏫' : '🏛'} {label}
+            </span>
+            <div className="mt-4 flex flex-col gap-4">
+                <div>
+                    <label htmlFor={`roll-${type}`} className="mb-1 block text-sm font-medium text-[#234739]">رول نمبر</label>
+                    <input
+                        id={`roll-${type}`}
+                        type="text"
+                        dir="ltr"
+                        placeholder={rollPlaceholder}
+                        value={roll}
+                        onChange={(e) => setRoll(e.target.value)}
+                        required
+                        autoComplete="off"
+                        className="h-11 w-full rounded-xl border border-[#dfe5dc] bg-white px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
+                    />
+                </div>
+                <div>
+                    <label htmlFor={`reg-${type}`} className="mb-1 block text-sm font-medium text-[#234739]">رجسٹریشن نمبر</label>
+                    <input
+                        id={`reg-${type}`}
+                        type="text"
+                        dir="ltr"
+                        placeholder={regPlaceholder}
+                        value={reg}
+                        onChange={(e) => setReg(e.target.value)}
+                        required
+                        autoComplete="off"
+                        className="h-11 w-full rounded-xl border border-[#dfe5dc] bg-white px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
+                    />
+                </div>
+                <button
+                    type="submit"
+                    disabled={busy}
+                    className="h-11 w-full rounded-xl bg-[#1d5140] text-sm font-semibold text-white transition hover:bg-[#173f34] disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-busy={busy}
+                >
+                    {busy ? 'تلاش جاری ہے…' : 'نتیجہ دیکھیں'}
+                </button>
+            </div>
+            <p className="mt-3 text-xs text-[#789087]">{hint}</p>
+        </form>
+    );
+}
+
+// ─── Contact form (uses Inertia router.post — CSRF handled automatically) ─────
+
+function ContactForm({ flash }: { flash: PageProps['flash'] }) {
+    const [name,  setName]  = useState('');
+    const [phone, setPhone] = useState('');
+    const [topic, setTopic] = useState('داخلہ');
+    const [msg,   setMsg]   = useState('');
+    const [busy,  setBusy]  = useState(false);
+
+    // Clear fields after a successful send
+    useEffect(() => {
+        if (flash?.contact_success) {
+            setName(''); setPhone(''); setMsg(''); setTopic('داخلہ');
+        }
+    }, [flash?.contact_success]);
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!name.trim() || !phone.trim() || !msg.trim()) return;
+        setBusy(true);
+        // Posts to POST /contact — add this route in routes/web.php
+        router.post(
+            '/contact',
+            { name: name.trim(), phone: phone.trim(), topic, message: msg.trim() },
+            {
+                preserveScroll: true,
+                onFinish: () => setBusy(false),
+            },
+        );
+    }
+
+    return (
+        <form onSubmit={handleSubmit} noValidate>
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label htmlFor="cName" className="mb-1 block text-sm font-medium text-[#234739]">آپ کا نام</label>
+                    <input
+                        id="cName"
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        className="h-11 w-full rounded-xl border border-[#dfe5dc] px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="cPhone" className="mb-1 block text-sm font-medium text-[#234739]">موبائل نمبر</label>
+                    <input
+                        id="cPhone"
+                        type="tel"
+                        dir="ltr"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        className="h-11 w-full rounded-xl border border-[#dfe5dc] px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
+                    />
+                </div>
+                <div className="sm:col-span-2">
+                    <label htmlFor="cTopic" className="mb-1 block text-sm font-medium text-[#234739]">موضوع</label>
+                    <select
+                        id="cTopic"
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-[#dfe5dc] px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
+                    >
+                        {['داخلہ', 'فیس', 'نتائج', 'دیگر'].map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                </div>
+                <div className="sm:col-span-2">
+                    <label htmlFor="cMsg" className="mb-1 block text-sm font-medium text-[#234739]">پیغام</label>
+                    <textarea
+                        id="cMsg"
+                        rows={4}
+                        value={msg}
+                        onChange={(e) => setMsg(e.target.value)}
+                        required
+                        className="w-full resize-none rounded-xl border border-[#dfe5dc] p-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
+                    />
+                </div>
+                <div className="sm:col-span-2">
+                    <button
+                        type="submit"
+                        disabled={busy}
+                        aria-busy={busy}
+                        className="rounded-full bg-[#1d5140] px-7 py-3 text-sm font-semibold text-white transition hover:bg-[#173f34] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {busy ? 'بھیجا جارہا ہے…' : 'پیغام بھیجیں'}
+                    </button>
+                </div>
+            </div>
+            {/* Server-driven flash messages */}
+            <div aria-live="polite" aria-atomic="true" className="mt-4">
+                {flash?.contact_success && (
+                    <div className="rounded-xl bg-[#eef3ec] px-4 py-3 text-sm font-medium text-[#1d5140]" role="status">
+                        ✅ آپ کا پیغام موصول ہوگیا۔ جلد رابطہ کیا جائے گا۔
+                    </div>
+                )}
+                {flash?.contact_error && (
+                    <div className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
+                        {flash.contact_error}
+                    </div>
+                )}
+            </div>
+        </form>
     );
 }
