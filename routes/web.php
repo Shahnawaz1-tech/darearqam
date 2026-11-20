@@ -1,5 +1,11 @@
 <?php
 
+use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\ClassController;
+use App\Http\Controllers\Admin\DashboardStatsController;
+use App\Http\Controllers\Admin\FeeController;
+use App\Http\Controllers\Admin\NoticeController;
+use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ResultController;
@@ -22,6 +28,41 @@ Route::post('results/wifaq', [ResultController::class, 'wifaq'])->name('results.
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    // ── Admin-only module routes ──────────────────────────────────────────
+    Route::middleware('tenant.role:owner,admin')->group(function () {
+        // Admin stats dashboard
+        Route::get('admin/dashboard', DashboardStatsController::class)
+            ->name('admin.dashboard');
+
+        // Students
+        Route::get('admin/students', [StudentController::class, 'index'])->name('admin.students.index');
+        Route::post('admin/students', [StudentController::class, 'store'])->name('admin.students.store');
+        Route::patch('admin/students/{student}', [StudentController::class, 'update'])->name('admin.students.update');
+        Route::delete('admin/students/{student}', [StudentController::class, 'destroy'])->name('admin.students.destroy');
+
+        // Classes
+        Route::get('admin/classes', [ClassController::class, 'index'])->name('admin.classes.index');
+        Route::post('admin/classes', [ClassController::class, 'store'])->name('admin.classes.store');
+        Route::patch('admin/classes/{class}', [ClassController::class, 'update'])->name('admin.classes.update');
+        Route::delete('admin/classes/{class}', [ClassController::class, 'destroy'])->name('admin.classes.destroy');
+
+        // Attendance
+        Route::get('admin/attendance', [AttendanceController::class, 'index'])->name('admin.attendance.index');
+        Route::post('admin/attendance', [AttendanceController::class, 'store'])->name('admin.attendance.store');
+
+        // Fees
+        Route::get('admin/fees', [FeeController::class, 'index'])->name('admin.fees.index');
+        Route::post('admin/fees', [FeeController::class, 'store'])->name('admin.fees.store');
+        Route::patch('admin/fees/{fee}', [FeeController::class, 'update'])->name('admin.fees.update');
+        Route::delete('admin/fees/{fee}', [FeeController::class, 'destroy'])->name('admin.fees.destroy');
+
+        // Notices
+        Route::get('admin/notices', [NoticeController::class, 'index'])->name('admin.notices.index');
+        Route::post('admin/notices', [NoticeController::class, 'store'])->name('admin.notices.store');
+        Route::patch('admin/notices/{notice}', [NoticeController::class, 'update'])->name('admin.notices.update');
+        Route::delete('admin/notices/{notice}', [NoticeController::class, 'destroy'])->name('admin.notices.destroy');
+    });
     Route::get('admin/dashboard', [DashboardController::class, 'admin'])
         ->middleware('tenant.role:owner,admin')
         ->name('admin.dashboard');

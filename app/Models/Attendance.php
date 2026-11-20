@@ -1,0 +1,31 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\BelongsToTenant;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Attendance extends Model
+{
+    use BelongsToTenant;
+
+    protected $fillable = ['student_id', 'class_id', 'date', 'status', 'note', 'marked_by'];
+
+    protected $casts = ['date' => 'date'];
+
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    public function class(): BelongsTo
+    {
+        return $this->belongsTo(MadrasaClass::class, 'class_id');
+    }
+
+    public function markedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'marked_by');
+    }
+}
