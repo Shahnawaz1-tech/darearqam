@@ -1,37 +1,10 @@
-/**
- * Welcome page — Madrasa Dar-e-Arqam Gurguri
- *
- * Production checklist:
- *  ✅  All images served from /storage (Laravel public disk) — swap src paths
- *      once real images are uploaded via admin panel.
- *  ✅  Contact form uses Inertia router.post() with CSRF — no fake setTimeout.
- *  ✅  Result lookup uses Inertia router.post() — mock data wired to real API route.
- *  ✅  No .html hrefs — all internal navigation uses #anchor or Inertia Link.
- *  ✅  window.print() is a native browser API — safe in production.
- *  ✅  No console.log / debug code.
- *  ✅  Proper aria-live, role, and keyboard-accessible controls throughout.
- *  ✅  Auth guard on portal link reads from Inertia shared props.
- */
-
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { dashboard, login } from '@/routes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PageProps extends Record<string, unknown> {
-    auth: {
-        user: { id: number; name: string; email: string } | null;
-    };
-    flash?: {
-        contact_success?: boolean;
-        contact_error?: string;
-        result_data?: ResultData | null;
-        result_error?: string;
-        wifaq_data?: ResultData | null;
-        wifaq_error?: string;
-    };
-}
+type Lang = 'ur' | 'en';
 
 interface ResultData {
     name: string;
@@ -40,789 +13,659 @@ interface ResultData {
     subjects: { name: string; marks: number; total: number }[];
 }
 
-// ─── Static data ──────────────────────────────────────────────────────────────
-// Hero images are stored under public/storage/ (Laravel public disk).
-// Upload via admin and update these paths. Using Unsplash CDN as placeholder
-// until real madrasa photos are uploaded.
+interface NoticeItem { id: number; title: string; type: string; date: string | null; is_new: boolean }
+interface Holder {
+    id: number; name: string; father: string | null; course: string; marks: number; total: number;
+    pct: string; grade: string; exam: 'internal' | 'wifaq'; rank: 1 | 2 | 3; quote: string | null;
+    featured: boolean; photo: string | null;
+}
+interface GalleryItem { id: number; label: string; category: string; layout: 'normal' | 'wide' | 'tall'; url: string }
 
-const HERO_IMAGES = [
-    { src: '/storage/hero/hero-1.jpg', fallback: 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=1600&q=80', alt: 'مدرسے کی تصویر ۱' },
-    { src: '/storage/hero/hero-2.jpg', fallback: 'https://images.unsplash.com/photo-1519817914152-22d216bb9170?w=1600&q=80', alt: 'مدرسے کی تصویر ۲' },
-    { src: '/storage/hero/hero-3.jpg', fallback: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?w=1600&q=80', alt: 'مدرسے کی تصویر ۳' },
-    { src: '/storage/hero/hero-4.jpg', fallback: 'https://images.unsplash.com/photo-1568667256549-094345857c59?w=1600&q=80', alt: 'مدرسے کی تصویر ۴' },
-    { src: '/storage/hero/hero-5.jpg', fallback: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1600&q=80', alt: 'مدرسے کی تصویر ۵' },
-];
+interface PageProps extends Record<string, unknown> {
+    auth: { user: { id: number; name: string; email: string } | null };
+    flash?: {
+        contact_success?: boolean; contact_error?: string;
+        result_data?: ResultData | null; result_error?: string;
+        wifaq_data?: ResultData | null; wifaq_error?: string;
+    };
+    stats: { students: number; teachers: number; depts: number };
+    notices: NoticeItem[];
+    positionHolders: Holder[];
+    gallery: GalleryItem[];
+}
 
-const STATS = [
-    { key: 'students', label: 'طلبہ', value: 320 },
-    { key: 'teachers', label: 'اساتذہ', value: 18 },
-    { key: 'depts', label: 'شعبے', value: 6 },
-];
+// ─── Bilingual copy ───────────────────────────────────────────────────────────
 
-const PROGRAMS = [
-    { num: '01', title: 'ناظرہ', desc: 'درست تلفظ کے ساتھ قرآن پڑھنے کی تعلیم، ابتدائی اور بڑے طلبہ کے لیے۔' },
-    { num: '02', title: 'حفظ', desc: 'تجربہ کار حفاظ کی نگرانی میں روزانہ دہرائی کے ساتھ حفظِ قرآن۔', accent: true },
-    { num: '03', title: 'درسِ نظامی', desc: 'ابتدائیہ سے عالمیہ تک آٹھ سالہ کلاسیکل دینی نصاب۔' },
-    { num: '04', title: 'تجوید', desc: 'قواعدِ تجوید اور قراءت — جو اپنی تلاوت بہتر بنانا چاہتے ہیں ان کے لیے۔', accent: true },
-    { num: '05', title: 'عربی زبان', desc: 'نحو، صرف اور بول چال کی عربی مرحلہ بمرحلہ سکھائی جاتی ہے۔' },
-    { num: '06', title: 'عصری مضامین', desc: 'اردو، انگریزی، ریاضی اور کمپیوٹر کی بنیادی تعلیم دینی پڑھائی کے ساتھ ساتھ۔', accent: true },
-];
-
-const NOTICES = [
-    { date: '۱۵ جنوری', title: 'سالانہ امتحان کا آغاز ۲۵ جنوری سے ہوگا', badge: 'نئی اطلاع', badgeGreen: true },
-    { date: '۱۰ جنوری', title: 'نئے سیشن کے لیے داخلہ فارم دستیاب ہیں' },
-    { date: '۵ جنوری', title: 'وفاق المدارس امتحان کی تیاری کلاسز شروع' },
-];
-
-const DATE_SHEET = [
-    { date: '۲۵ جنوری ۲۰۲۶', subject: 'قرآنِ کریم', time: '8:00 AM', hall: 'ہال اے' },
-    { date: '۲۷ جنوری ۲۰۲۶', subject: 'حدیث شریف', time: '8:00 AM', hall: 'ہال بی' },
-    { date: '۲۹ جنوری ۲۰۲۶', subject: 'فقہ اسلامی', time: '8:00 AM', hall: 'ہال اے' },
-    { date: '۳۱ جنوری ۲۰۲۶', subject: 'عربی زبان', time: '8:00 AM', hall: 'ہال سی' },
-    { date: '۲ فروری ۲۰۲۶', subject: 'اردو', time: '8:00 AM', hall: 'ہال بی' },
-];
-
-const RESOURCES = [
-    { title: 'داخلہ رہنمائی', desc: 'شرائط اور درخواست کا طریقہ', href: '#admissions', keywords: 'admission داخلہ درخواست فارم', icon: '👤' },
-    { title: 'امتحان و اعلانات', desc: 'تازہ نوٹس اور ڈیٹ شیٹ', href: '#notices', keywords: 'exam date sheet امتحان اعلان', icon: '📅' },
-    { title: 'نتائج', desc: 'رول نمبر کے ذریعے نتیجہ دیکھیں', href: '#results', keywords: 'result marks roll نتیجہ نمبر', icon: '📋' },
-    { title: 'تعلیمی شعبے', desc: 'کورسز اور نصاب کا تعارف', href: '#programs', keywords: 'program courses hifz حفظ شعبہ', icon: '📖' },
-    { title: 'اساتذہ', desc: 'تدریسی شعبے اور طلبہ کی رہنمائی', href: '#teachers', keywords: 'teacher ustad اساتذہ', icon: '🧑‍🏫' },
-    { title: 'سوال و جواب', desc: 'جامعہ بنوری ٹاؤن کی علمی رہنمائی', href: 'https://www.banuri.edu.pk/new-questions', keywords: 'fatwa question answer فتوی سوال', icon: '💬', external: true },
-    { title: 'کتب و علمی مضامین', desc: 'مستند مطالعے کے لیے کتب کا گوشہ', href: 'https://www.banuri.edu.pk/books', keywords: 'books articles library کتب', icon: '📚', external: true },
-    { title: 'وفاق المدارس لاگ اِن', desc: 'مدارس کے لیے وفاق کا آفیشل پورٹل', href: 'https://www.wifaqulmadaris.org/Account/MadarisLogin', keywords: 'wifaq madaris وفاق رجسٹریشن', icon: '🏛️', external: true },
-];
-
-const POSITION_HOLDERS = [
-    {
-        name: 'احمد علی', father: 'محمد اکرم', course: 'درسِ نظامی، سال اول',
-        marks: 580, total: 600, pct: '96.7', grade: 'A+',
-        exam: 'داخلی امتحان', badge: 'پہلی پوزیشن', badgeColor: 'gold' as const,
-        quote: '"علم وہ روشنی ہے جو دل کو منور کرتی ہے۔"', featured: true,
-        img: '/storage/students/s1.jpg',
-        imgFallback: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=70',
+const COPY = {
+    ur: {
+        brand: 'مدرسہ دارِ ارقم', brandSub: 'Dar-e-Arqam Gurguri', portal: 'پورٹل لاگ اِن', dash: 'ڈیش بورڈ', toggle: 'English',
+        nav: [['تعارف', '#about'], ['شعبے', '#programs'], ['اساتذہ', '#teachers'], ['داخلہ', '#admissions'], ['نوٹس', '#notices'], ['نتائج', '#results'], ['رابطہ', '#contact']],
+        badge: 'داخلہ کھلا ہے — سیشن ۲۰۲۶–۲۰۲۷',
+        heroTitle: 'مدرسہ دارِ ارقم گرگری',
+        heroSub: 'ایک ایسی تعلیمی جگہ جہاں قرآن، اچھا کردار اور مفید علم ایک ساتھ سکھائے جاتے ہیں۔',
+        apply: 'داخلے کے لیے درخواست', seeResult: 'نتیجہ دیکھیں',
+        statsTitle: 'اعداد و شمار', students: 'طلبہ', teachers: 'اساتذہ', depts: 'شعبے',
+        aboutTitle: 'مدرسے کے بارے میں',
+        aboutSub: 'قرآن، حدیث، فقہ اور عربی کے ساتھ اردو، انگریزی اور ریاضی بھی — تاکہ طلبہ ایمان اور روزمرہ مہارتوں میں دونوں ترقی کریں۔',
+        foundTitle: 'قیام سنگ بنیاد', foundBy: 'بدست', founders: ['مولانا مقصود گل رحمۃ اللّٰہ علیہ', 'مولانا عبداللّٰہ منتظر صاحب', 'علاقائی علماء کرام'],
+        bento: [
+            { t: 'قرآن اول', d: 'تلاوت، حفظ اور سمجھ — ہر چیز سے پہلے۔', dark: true },
+            { t: 'کردار سازی', d: 'ادب، دیانت اور احترام روزانہ سکھائے اور پرکھے جاتے ہیں۔' },
+            { t: 'مفید مہارتیں', d: 'زبانیں، ریاضی اور کمپیوٹر کی بنیادیں۔' },
+            { t: 'ہر طالب علم', d: 'اساتذہ حاضری اور امتحانات پر نظر رکھتے اور والدین کو باخبر رکھتے ہیں۔', dark: true },
+        ],
+        ayah: 'اِقْرَأْ بِاسْمِ رَبِّكَ الَّذِيْ خَلَقَ', ayahT: 'ہمارا پہلا سبق', ayahD: 'اپنے رب کے نام سے پڑھ جس نے پیدا کیا۔',
+        campus: 'قیام ۲۰۲۰ · گرگری',
+        teachersTitle: 'اساتذہ — تعلیم اور رہنمائی',
+        teachersSub: 'ہمارے اساتذہ قرآن، دینی نصاب اور عصری مضامین کی تعلیم کے ساتھ روزانہ رہنمائی کرتے ہیں۔',
+        teamName: 'دارِ ارقم تدریسی ٹیم',
+        facts: [
+            ['پڑھائی جانے والی کلاسیں', 'ناظرہ · حفظ · تجوید · درسِ نظامی'],
+            ['مضامین', 'قرآن، حدیث، فقہ، عربی، اردو، انگریزی اور ریاضی'],
+            ['والدین کی مدد', 'پیش رفت، حاضری اور والدین سے ملاقات'],
+        ],
+        phoneLabel: 'فون / واٹس ایپ', askTeam: 'تدریسی ٹیم کے بارے میں پوچھیں',
+        programsTitle: 'تعلیمی شعبہ جات', programsSub: 'شعبے اور کورسز ہر سیشن میں تبدیل ہوسکتے ہیں۔',
+        programs: [
+            ['ناظرہ', 'درست تلفظ کے ساتھ قرآن پڑھنے کی تعلیم۔'],
+            ['حفظ', 'تجربہ کار حفاظ کی نگرانی میں روزانہ دہرائی کے ساتھ حفظِ قرآن۔'],
+            ['درسِ نظامی', 'ابتدائیہ سے عالمیہ تک آٹھ سالہ دینی نصاب۔'],
+            ['تجوید', 'قواعدِ تجوید اور قراءت۔'],
+            ['عربی زبان', 'نحو، صرف اور بول چال کی عربی مرحلہ بمرحلہ۔'],
+            ['عصری مضامین', 'اردو، انگریزی، ریاضی اور کمپیوٹر کی بنیادی تعلیم۔'],
+        ],
+        hubTitle: 'تعلیمی و رہنمائی مرکز', hubSearch: 'مثلاً داخلہ، نتیجہ، کتابیں', hubEmpty: 'اس تلاش سے متعلق کوئی معلومات نہیں ملیں۔', external: 'بیرونی ویب سائٹ ↗',
+        hub: [
+            ['داخلہ رہنمائی', 'شرائط اور درخواست کا طریقہ', '#admissions', 'admission داخلہ فارم'],
+            ['امتحان و اعلانات', 'تازہ نوٹس اور ڈیٹ شیٹ', '#notices', 'exam date sheet امتحان'],
+            ['نتائج', 'رول نمبر کے ذریعے نتیجہ دیکھیں', '#results', 'result roll نتیجہ'],
+            ['تعلیمی شعبے', 'کورسز اور نصاب کا تعارف', '#programs', 'courses hifz حفظ'],
+            ['اساتذہ', 'تدریسی شعبے اور رہنمائی', '#teachers', 'teacher اساتذہ'],
+            ['سوال و جواب', 'جامعہ بنوری ٹاؤن کی علمی رہنمائی', 'https://www.banuri.edu.pk/new-questions', 'fatwa فتوی سوال'],
+            ['کتب و علمی مضامین', 'مستند مطالعے کے لیے کتب', 'https://www.banuri.edu.pk/books', 'books کتب'],
+            ['وفاق المدارس لاگ اِن', 'مدارس کے لیے وفاق کا آفیشل پورٹل', 'https://www.wifaqulmadaris.org/Account/MadarisLogin', 'wifaq وفاق'],
+        ],
+        admTitle: 'داخلہ کیسے لیں',
+        steps: [
+            ['درخواست فارم پُر کریں', 'طالب علم اور سرپرست کی تفصیل کے ساتھ فارم مکمل کریں۔'],
+            ['دستاویزات جمع کرائیں', 'بی فارم یا شناختی کارڈ، دو تصاویر اور سابقہ سرٹیفکیٹ (اگر ہو)۔'],
+            ['اساتذہ سے ملاقات', 'مختصر انٹرویو اور سطح کا امتحان مناسب کلاس کا تعین کرتا ہے۔'],
+            ['داخلہ نمبر حاصل کریں', 'منظوری کے بعد رجسٹریشن نمبر اور طالب علم کارڈ ملتا ہے۔'],
+        ],
+        admOpen: 'داخلہ کھلا ہے', admOpenD: 'سیشن ۲۰۲۶–۲۰۲۷ کی درخواستیں ماہ کے آخر تک قبول کی جارہی ہیں۔',
+        admPoints: ['لڑکے اور لڑکیوں کے الگ شعبے', 'ڈے اسکالر اور رہائشی جگہیں', 'مستحق طلبہ کے لیے فیس میں رعایت'],
+        admBtn: 'داخلہ فارم کی درخواست کریں',
+        noticesTitle: 'اعلانات اور ڈیٹ شیٹ', latest: 'تازہ نوٹس', noNotices: 'ابھی کوئی نوٹس نہیں۔', newTag: 'نئی اطلاع',
+        sheetTitle: 'سالانہ امتحان ڈیٹ شیٹ', sheetClass: 'کلاس: درسِ نظامی، سال اول', print: 'پرنٹ',
+        sheetHead: ['تاریخ', 'مضمون', 'وقت', 'ہال'],
+        sheet: [
+            ['۲۵ جنوری ۲۰۲۶', 'قرآنِ کریم', '8:00 AM', 'ہال اے'], ['۲۷ جنوری ۲۰۲۶', 'حدیث شریف', '8:00 AM', 'ہال بی'],
+            ['۲۹ جنوری ۲۰۲۶', 'فقہ اسلامی', '8:00 AM', 'ہال اے'], ['۳۱ جنوری ۲۰۲۶', 'عربی زبان', '8:00 AM', 'ہال سی'],
+            ['۲ فروری ۲۰۲۶', 'اردو', '8:00 AM', 'ہال بی'],
+        ],
+        resTitle: 'اپنا نتیجہ دیکھیں', resSub: 'رول نمبر اور رجسٹریشن نمبر درج کریں جو آپ کی رول سلپ پر لکھا ہے۔',
+        tabInternal: 'داخلی امتحان', tabWifaq: 'وفاق المدارس', roll: 'رول نمبر', reg: 'رجسٹریشن نمبر', find: 'نتیجہ دیکھیں', finding: 'تلاش جاری ہے…',
+        father: 'والد', subject: 'مضمون', marks: 'نمبر', outOf: 'کُل', grand: 'مجموعی', percent: 'فیصد', gradeL: 'گریڈ',
+        posTitle: 'پوزیشن ہولڈرز', posSub: 'داخلی اور وفاق المدارس کے امتحانات میں نمایاں کامیابی حاصل کرنے والے طلبہ۔',
+        ranks: { 1: 'پہلی پوزیشن', 2: 'دوسری پوزیشن', 3: 'تیسری پوزیشن' }, exams: { internal: 'داخلی امتحان', wifaq: 'وفاق المدارس' }, noPos: 'پوزیشن ہولڈرز جلد شامل کیے جائیں گے۔',
+        galTitle: 'مدرسے کی زندگی', galFilters: [['all', 'سب'], ['quran', 'قرآن'], ['campus', 'کیمپس'], ['events', 'تقاریب']], noGal: 'تصاویر جلد شامل کی جائیں گی۔',
+        contactTitle: 'ہم سے رابطہ کریں', send: 'پیغام بھیجیں', sending: 'بھیجا جارہا ہے…',
+        contact: [['پتہ', 'گرگری، پاکستان'], ['فون / واٹس ایپ', '00923349798988'], ['ای میل', 'qarimuhammadarif988@gmail.com'], ['دفتری اوقات', 'ہفتہ تا جمعرات، صبح ۸ تا دوپہر ۲']],
+        fName: 'آپ کا نام', fPhone: 'موبائل نمبر', fTopic: 'موضوع', fMsg: 'پیغام', topics: ['داخلہ', 'فیس', 'نتائج', 'دیگر'], sent: 'آپ کا پیغام موصول ہوگیا۔ جلد رابطہ کیا جائے گا۔',
+        footer: 'قرآن کی تعلیم، علم کی جستجو اور اچھے کردار کی تربیت۔', top: 'واپس اوپر ↑', prev: 'پچھلی تصویر', next: 'اگلی تصویر',
     },
-    {
-        name: 'عمر فاروق', father: 'فاروق احمد', course: 'حفظِ قرآن',
-        marks: 565, total: 600, pct: '94.2',
-        exam: 'داخلی امتحان', badge: 'دوسری پوزیشن', badgeColor: 'silver' as const,
-        img: '/storage/students/s2.jpg',
-        imgFallback: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=70',
+    en: {
+        brand: 'Madrasa Dar-e-Arqam', brandSub: 'Gurguri', portal: 'Portal login', dash: 'Dashboard', toggle: 'اردو',
+        nav: [['About', '#about'], ['Programs', '#programs'], ['Teachers', '#teachers'], ['Admissions', '#admissions'], ['Notices', '#notices'], ['Results', '#results'], ['Contact', '#contact']],
+        badge: 'Admissions open — session 2026–2027',
+        heroTitle: 'Madrasa Dar-e-Arqam Gurguri',
+        heroSub: 'A place of learning where the Quran, good character and useful knowledge are taught together.',
+        apply: 'Apply for admission', seeResult: 'Check your result',
+        statsTitle: 'At a glance', students: 'Students', teachers: 'Teachers', depts: 'Departments',
+        aboutTitle: 'About the madrasa',
+        aboutSub: 'Quran, Hadith, Fiqh and Arabic alongside Urdu, English and mathematics, so students grow in faith and in everyday skills.',
+        foundTitle: 'Foundation stone laid', foundBy: 'By', founders: ['Maulana Maqsood Gul (rahimahullah)', 'Maulana Abdullah Muntazir', 'Local ulama'],
+        bento: [
+            { t: 'Quran first', d: 'Recitation, memorisation and understanding come before everything else.', dark: true },
+            { t: 'Building character', d: 'Manners, honesty and respect are taught and checked daily.' },
+            { t: 'Useful skills', d: 'Languages, mathematics and computer basics.' },
+            { t: 'Every student', d: 'Teachers track attendance and exams and keep parents informed.', dark: true },
+        ],
+        ayah: 'اِقْرَأْ بِاسْمِ رَبِّكَ الَّذِيْ خَلَقَ', ayahT: 'Our first lesson', ayahD: 'Read in the name of your Lord who created.',
+        campus: 'Est. 2020 · Gurguri',
+        teachersTitle: 'Teachers: teaching and guidance',
+        teachersSub: 'Our teachers guide students daily in the Quran, the religious curriculum and modern subjects.',
+        teamName: 'Dar-e-Arqam teaching team',
+        facts: [
+            ['Classes offered', 'Nazra · Hifz · Tajweed · Dars-e-Nizami'],
+            ['Subjects', 'Quran, Hadith, Fiqh, Arabic, Urdu, English and mathematics'],
+            ['Parent support', 'Progress, attendance and parent meetings'],
+        ],
+        phoneLabel: 'Phone / WhatsApp', askTeam: 'Ask about the teaching team',
+        programsTitle: 'Departments', programsSub: 'Departments and courses may change each session.',
+        programs: [
+            ['Nazra', 'Reading the Quran with correct pronunciation.'],
+            ['Hifz', 'Memorising the Quran under experienced huffaz with daily revision.'],
+            ['Dars-e-Nizami', 'The eight-year classical curriculum, from Ibtidaiya to Aalamiya.'],
+            ['Tajweed', 'The rules of Tajweed and recitation.'],
+            ['Arabic language', 'Grammar, morphology and spoken Arabic, step by step.'],
+            ['Modern subjects', 'Urdu, English, mathematics and computer basics.'],
+        ],
+        hubTitle: 'Learning and guidance hub', hubSearch: 'e.g. admission, result, books', hubEmpty: 'Nothing matched your search.', external: 'External site ↗',
+        hub: [
+            ['Admission guide', 'Requirements and how to apply', '#admissions', 'admission form داخلہ'],
+            ['Exams and notices', 'Latest notices and date sheet', '#notices', 'exam date sheet امتحان'],
+            ['Results', 'Look up a result by roll number', '#results', 'result roll نتیجہ'],
+            ['Departments', 'Courses and curriculum', '#programs', 'courses hifz حفظ'],
+            ['Teachers', 'Teaching staff and guidance', '#teachers', 'teacher اساتذہ'],
+            ['Questions and answers', 'Scholarly guidance from Jamia Banuri Town', 'https://www.banuri.edu.pk/new-questions', 'fatwa فتوی'],
+            ['Books and articles', 'Reliable books for study', 'https://www.banuri.edu.pk/books', 'books کتب'],
+            ['Wifaq login', 'Official Wifaq portal for madrasas', 'https://www.wifaqulmadaris.org/Account/MadarisLogin', 'wifaq وفاق'],
+        ],
+        admTitle: 'How to apply',
+        steps: [
+            ['Fill in the form', 'Complete the form with the student and guardian details.'],
+            ['Submit documents', 'B-form or ID card, two photos and a previous certificate if any.'],
+            ['Meet the teachers', 'A short interview and level test decide the right class.'],
+            ['Get your admission number', 'After approval you receive a registration number and student card.'],
+        ],
+        admOpen: 'Admissions are open', admOpenD: 'Applications for 2026–2027 are accepted until the end of the month.',
+        admPoints: ['Separate sections for boys and girls', 'Day scholar and residential places', 'Fee concessions for deserving students'],
+        admBtn: 'Request an admission form',
+        noticesTitle: 'Notices and date sheet', latest: 'Latest notices', noNotices: 'No notices yet.', newTag: 'New',
+        sheetTitle: 'Annual exam date sheet', sheetClass: 'Class: Dars-e-Nizami, year 1', print: 'Print',
+        sheetHead: ['Date', 'Subject', 'Time', 'Hall'],
+        sheet: [
+            ['25 Jan 2026', 'Holy Quran', '8:00 AM', 'Hall A'], ['27 Jan 2026', 'Hadith', '8:00 AM', 'Hall B'],
+            ['29 Jan 2026', 'Islamic jurisprudence', '8:00 AM', 'Hall A'], ['31 Jan 2026', 'Arabic', '8:00 AM', 'Hall C'],
+            ['2 Feb 2026', 'Urdu', '8:00 AM', 'Hall B'],
+        ],
+        resTitle: 'Check your result', resSub: 'Enter the roll number and registration number printed on your roll slip.',
+        tabInternal: 'Internal exam', tabWifaq: 'Wifaq ul Madaris', roll: 'Roll number', reg: 'Registration number', find: 'Show result', finding: 'Searching…',
+        father: 'Father', subject: 'Subject', marks: 'Marks', outOf: 'Total', grand: 'Total', percent: 'Percentage', gradeL: 'Grade',
+        posTitle: 'Position holders', posSub: 'Students who achieved top results in the internal and Wifaq exams.',
+        ranks: { 1: '1st position', 2: '2nd position', 3: '3rd position' }, exams: { internal: 'Internal exam', wifaq: 'Wifaq ul Madaris' }, noPos: 'Position holders will be added soon.',
+        galTitle: 'Life at the madrasa', galFilters: [['all', 'All'], ['quran', 'Quran'], ['campus', 'Campus'], ['events', 'Events']], noGal: 'Photos will be added soon.',
+        contactTitle: 'Contact us', send: 'Send message', sending: 'Sending…',
+        contact: [['Address', 'Gurguri, Pakistan'], ['Phone / WhatsApp', '00923349798988'], ['Email', 'qarimuhammadarif988@gmail.com'], ['Office hours', 'Saturday to Thursday, 8 am to 2 pm']],
+        fName: 'Your name', fPhone: 'Mobile number', fTopic: 'Topic', fMsg: 'Message', topics: ['Admission', 'Fees', 'Results', 'Other'], sent: 'Your message was received. We will contact you soon.',
+        footer: 'Teaching the Quran, seeking knowledge, building character.', top: 'Back to top ↑', prev: 'Previous photo', next: 'Next photo',
     },
-    {
-        name: 'زید حسن', father: 'حسن علی', course: 'شہادۃ العالمیہ',
-        marks: 572, total: 600, pct: '95.3',
-        exam: 'وفاق المدارس', badge: 'پہلی پوزیشن', badgeColor: 'gold' as const,
-        img: '/storage/students/s3.jpg',
-        imgFallback: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&q=70',
-    },
-    {
-        name: 'بلال خان', father: 'خان محمد', course: 'شہادۃ الثانویہ',
-        marks: 558, total: 600, pct: '93.0',
-        exam: 'وفاق المدارس', badge: 'تیسری پوزیشن', badgeColor: 'bronze' as const,
-        img: '/storage/students/s4.jpg',
-        imgFallback: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&q=70',
-    },
+} as const;
+
+type Copy = (typeof COPY)[Lang];
+
+const HERO = [
+    { src: '/storage/hero/hero-1.jpg', fb: 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=1600&q=80' },
+    { src: '/storage/hero/hero-2.jpg', fb: 'https://images.unsplash.com/photo-1519817914152-22d216bb9170?w=1600&q=80' },
+    { src: '/storage/hero/hero-3.jpg', fb: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?w=1600&q=80' },
 ];
 
-const GALLERY = [
-    { src: '/storage/gallery/g1.jpg', fallback: 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=70', label: 'قرآنی کلاس', cat: 'quran', wide: true },
-    { src: '/storage/gallery/g2.jpg', fallback: 'https://images.unsplash.com/photo-1519817914152-22d216bb9170?w=800&q=70', label: 'مدرسہ کیمپس', cat: 'campus' },
-    { src: '/storage/gallery/g3.jpg', fallback: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?w=800&q=70', label: 'سالانہ تقریب', cat: 'events' },
-    { src: '/storage/gallery/g4.jpg', fallback: 'https://images.unsplash.com/photo-1568667256549-094345857c59?w=800&q=70', label: 'امتحانی ہال', cat: 'campus' },
-    { src: '/storage/gallery/g5.jpg', fallback: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=70', label: 'طلبہ', cat: 'quran', tall: true },
-    { src: '/storage/gallery/g6.jpg', fallback: 'https://images.unsplash.com/photo-1562564055-71e051d33c19?w=800&q=70', label: 'حفظ گریجویشن', cat: 'events' },
-];
+const NOTICE_TONE: Record<string, string> = {
+    exam: 'bg-blue-50 text-blue-700', fee: 'bg-amber-50 text-amber-700', urgent: 'bg-red-50 text-red-700',
+    holiday: 'bg-violet-50 text-violet-700', general: 'bg-[#eef3ec] text-[#1d5140]',
+};
+const RANK_TONE = { 1: 'bg-[#c9a24b]', 2: 'bg-[#8d949b]', 3: 'bg-[#9a6b2f]' } as const;
+const PHONE = '+923349798988';
+const FIELD = 'h-11 w-full rounded-xl border border-[#dfe5dc] bg-white px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Small helpers ────────────────────────────────────────────────────────────
 
-/** Falls back to Unsplash CDN if the local storage image 404s. */
-function FallbackImg({
-    src, fallback, alt, className, loading = 'lazy',
-}: { src: string; fallback: string; alt: string; className?: string; loading?: 'lazy' | 'eager' }) {
+function Img({ src, fb, alt, className, eager }: { src: string; fb?: string; alt: string; className?: string; eager?: boolean }) {
     return (
         <img
-            src={src}
-            alt={alt}
-            className={className}
-            loading={loading}
-            decoding="async"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallback; }}
+            src={src} alt={alt} className={className} loading={eager ? 'eager' : 'lazy'} decoding="async"
+            onError={(e) => { if (fb && e.currentTarget.src !== fb) e.currentTarget.src = fb; }}
         />
     );
 }
 
-function badgeCls(color: 'gold' | 'silver' | 'bronze') {
-    const map = { gold: 'bg-[#d4a017] text-white', silver: 'bg-[#9e9e9e] text-white', bronze: 'bg-[#8b6914] text-white' };
-    return map[color];
-}
-
-// ─── Animated counter ─────────────────────────────────────────────────────────
-
-function AnimatedCounter({ value, duration = 1800 }: { value: number; duration?: number }) {
-    const [count, setCount] = useState(0);
-    const ref = useRef<HTMLSpanElement>(null);
-    const started = useRef(false);
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting && !started.current) {
-                    started.current = true;
-                    const start = Date.now();
-                    const tick = () => {
-                        const elapsed = Date.now() - start;
-                        const progress = Math.min(elapsed / duration, 1);
-                        const eased = 1 - Math.pow(1 - progress, 3);
-                        setCount(Math.round(eased * value));
-                        if (progress < 1) requestAnimationFrame(tick);
-                    };
-                    requestAnimationFrame(tick);
-                }
-            },
-            { threshold: 0.4 },
-        );
-        if (ref.current) observer.observe(ref.current);
-        return () => observer.disconnect();
-    }, [value, duration]);
-
-    return <span ref={ref}>{count}</span>;
-}
-
-// ─── Hero carousel ────────────────────────────────────────────────────────────
-
-function HeroCarousel() {
-    const [active, setActive] = useState(0);
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const count = HERO_IMAGES.length;
-
-    const go = useCallback(
-        (idx: number) => setActive(((idx % count) + count) % count),
-        [count],
-    );
-
-    useEffect(() => {
-        intervalRef.current = setInterval(() => setActive((a) => (a + 1) % count), 6000);
-        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-    }, [count]);
-
+function Title({ children, sub }: { children: React.ReactNode; sub?: string }) {
     return (
-        <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-            {HERO_IMAGES.map((slide, i) => (
-                <FallbackImg
-                    key={slide.src}
-                    src={slide.src}
-                    fallback={slide.fallback}
-                    alt={slide.alt}
-                    loading={i === 0 ? 'eager' : 'lazy'}
-                    className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-1000 ${i === active ? 'opacity-100' : 'opacity-0'}`}
-                />
-            ))}
-            <button
-                onClick={() => go(active - 1)}
-                aria-label="پچھلی تصویر"
-                className="absolute right-4 top-1/2 z-20 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition hover:bg-black/50"
-            >
-                &#8249;
-            </button>
-            <button
-                onClick={() => go(active + 1)}
-                aria-label="اگلی تصویر"
-                className="absolute left-4 top-1/2 z-20 -translate-y-1/2 flex size-10 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition hover:bg-black/50"
-            >
-                &#8250;
-            </button>
-            <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2" role="tablist" aria-label="سلائیڈ انتخاب">
-                {HERO_IMAGES.map((_, i) => (
-                    <button
-                        key={i}
-                        role="tab"
-                        aria-selected={i === active}
-                        aria-label={`سلائیڈ ${i + 1}`}
-                        onClick={() => go(i)}
-                        className={`h-2 rounded-full transition-all ${i === active ? 'w-6 bg-[#e0b66f]' : 'w-2 bg-white/60'}`}
-                    />
-                ))}
-            </div>
+        <div className="mb-10 text-center">
+            <h2 className="text-3xl font-bold text-[#0f3d2e] sm:text-4xl">{children}</h2>
+            <div className="mx-auto mt-3 h-1 w-14 rounded bg-[#c9a24b]" />
+            {sub && <p className="mx-auto mt-4 max-w-xl text-sm text-[#5f7268]">{sub}</p>}
         </div>
     );
 }
 
-// ─── Result card ──────────────────────────────────────────────────────────────
+function Counter({ value }: { value: number }) {
+    const [n, setN] = useState(0);
+    const ref = useRef<HTMLSpanElement>(null);
+    const done = useRef(false);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const io = new IntersectionObserver(([e]) => {
+            if (!e.isIntersecting || done.current) return;
+            done.current = true;
+            if (reduce) { setN(value); return; }
+            const t0 = performance.now();
+            const tick = (t: number) => {
+                const p = Math.min((t - t0) / 1600, 1);
+                setN(Math.round((1 - Math.pow(1 - p, 3)) * value));
+                if (p < 1) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+        }, { threshold: 0.4 });
+        io.observe(el);
+        return () => io.disconnect();
+    }, [value]);
+    return <span ref={ref}>{n.toLocaleString()}</span>;
+}
 
-function ResultCard({ data }: { data: ResultData }) {
-    const totalMarks = data.subjects.reduce((s, x) => s + x.marks, 0);
-    const totalMax   = data.subjects.reduce((s, x) => s + x.total, 0);
-    const pct  = ((totalMarks / totalMax) * 100).toFixed(1);
-    const grade = Number(pct) >= 90 ? 'A+' : Number(pct) >= 80 ? 'A' : Number(pct) >= 70 ? 'B' : Number(pct) >= 60 ? 'C' : 'D';
+function Hero({ t }: { t: Copy }) {
+    const [i, setI] = useState(0);
+    const go = useCallback((n: number) => setI(((n % HERO.length) + HERO.length) % HERO.length), []);
+    useEffect(() => {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const id = setInterval(() => setI((a) => (a + 1) % HERO.length), 6500);
+        return () => clearInterval(id);
+    }, []);
+    return (
+        <>
+            <div className="absolute inset-0" aria-hidden="true">
+                {HERO.map((s, k) => (
+                    <Img key={s.src} src={s.src} fb={s.fb} alt="" eager={k === 0}
+                        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${k === i ? 'opacity-100' : 'opacity-0'}`} />
+                ))}
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a2a1f]/80 via-[#0a2a1f]/60 to-[#0a2a1f]/90" aria-hidden="true" />
+            <div className="absolute bottom-24 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3" dir="ltr">
+                <button type="button" onClick={() => go(i - 1)} aria-label={t.prev} className="flex size-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur hover:bg-white/30">‹</button>
+                {HERO.map((s, k) => (
+                    <button key={s.src} type="button" onClick={() => go(k)} aria-label={`${k + 1}`} aria-current={k === i}
+                        className={`h-2 rounded-full transition-all ${k === i ? 'w-6 bg-[#c9a24b]' : 'w-2 bg-white/60'}`} />
+                ))}
+                <button type="button" onClick={() => go(i + 1)} aria-label={t.next} className="flex size-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur hover:bg-white/30">›</button>
+            </div>
+        </>
+    );
+}
 
+function ResultCard({ d, t }: { d: ResultData; t: Copy }) {
+    const got = d.subjects.reduce((s, x) => s + x.marks, 0);
+    const max = d.subjects.reduce((s, x) => s + x.total, 0);
+    const pct = max ? (got / max) * 100 : 0;
+    const grade = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : 'D';
     return (
         <div className="rounded-2xl border border-[#e8ebe3] bg-white p-6 shadow-lg">
-            <div className="mb-4 flex items-start justify-between gap-2 flex-wrap">
-                <div>
-                    <h3 className="text-lg font-bold text-[#183b32]">{data.name}</h3>
-                    <p className="text-sm text-[#718178]">والد: {data.father}</p>
-                    <p className="text-sm text-[#718178]">{data.course}</p>
-                </div>
-                <span className="rounded-full bg-[#eef3ec] px-3 py-1 text-sm font-bold text-[#1d5140]">{grade}</span>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b border-[#ecece4]">
-                            <th className="pb-2 text-right font-semibold text-[#526c61]">مضمون</th>
-                            <th className="pb-2 text-center font-semibold text-[#526c61]">نمبر</th>
-                            <th className="pb-2 text-center font-semibold text-[#526c61]">کُل</th>
+            <h3 className="text-lg font-bold text-[#0f3d2e]">{d.name}</h3>
+            <p className="text-sm text-[#5f7268]">{t.father}: {d.father} · {d.course}</p>
+            <table className="mt-4 w-full text-sm">
+                <thead><tr className="border-b border-[#ecece4] text-[#526c61]">
+                    <th className="pb-2 text-start font-semibold">{t.subject}</th>
+                    <th className="pb-2 text-center font-semibold">{t.marks}</th>
+                    <th className="pb-2 text-center font-semibold">{t.outOf}</th>
+                </tr></thead>
+                <tbody>
+                    {d.subjects.map((s) => (
+                        <tr key={s.name} className="border-b border-[#f5f5f0]">
+                            <td className="py-2">{s.name}</td>
+                            <td className="py-2 text-center font-semibold text-[#1d5140]">{s.marks}</td>
+                            <td className="py-2 text-center text-[#5f7268]">{s.total}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {data.subjects.map((s) => (
-                            <tr key={s.name} className="border-b border-[#f5f5f0]">
-                                <td className="py-2 text-[#234739]">{s.name}</td>
-                                <td className="py-2 text-center font-semibold text-[#1d5140]">{s.marks}</td>
-                                <td className="py-2 text-center text-[#718178]">{s.total}</td>
-                            </tr>
-                        ))}
-                        <tr className="font-bold text-[#183b32]">
-                            <td className="pt-3">مجموعی</td>
-                            <td className="pt-3 text-center text-[#1d5140]">{totalMarks}</td>
-                            <td className="pt-3 text-center">{totalMax}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div className="mt-4 flex items-center gap-4 rounded-xl bg-[#eef3ec] px-4 py-3">
-                <span className="text-sm text-[#526c61]">فیصد:</span>
-                <span className="text-lg font-bold text-[#1d5140]">{pct}%</span>
+                    ))}
+                    <tr className="font-bold"><td className="pt-3">{t.grand}</td><td className="pt-3 text-center">{got}</td><td className="pt-3 text-center">{max}</td></tr>
+                </tbody>
+            </table>
+            <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#eef3ec] px-4 py-3">
+                <span className="text-sm text-[#526c61]">{t.percent}</span>
+                <span className="text-lg font-bold text-[#1d5140]">{pct.toFixed(1)}%</span>
                 <span className="ms-auto rounded-full bg-[#1d5140] px-3 py-1 text-sm font-bold text-white">{grade}</span>
             </div>
         </div>
     );
 }
 
-// ─── Section divider helper ───────────────────────────────────────────────────
-
-function SectionHeader({ eyebrow, title, sub }: { eyebrow?: string; title: string; sub?: string }) {
+function ResultForm({ type, t }: { type: 'internal' | 'wifaq'; t: Copy }) {
+    const [roll, setRoll] = useState('');
+    const [reg, setReg] = useState('');
+    const [busy, setBusy] = useState(false);
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!roll.trim() || !reg.trim()) return;
+        setBusy(true);
+        router.post(`/results/${type}`, { roll: roll.trim(), reg: reg.trim() }, { preserveScroll: true, onFinish: () => setBusy(false) });
+    }
     return (
-        <div className="mb-10 text-center">
-            {eyebrow && <span className="text-sm font-semibold tracking-wide text-[#b57d38]">{eyebrow}</span>}
-            <h2 className="mt-2 text-3xl font-bold text-[#183b32] sm:text-4xl">{title}</h2>
-            <div className="mx-auto mt-3 h-1 w-14 rounded bg-[#2d7a5a]" />
-            {sub && <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#718178]">{sub}</p>}
-        </div>
+        <form onSubmit={submit} noValidate className="rounded-2xl border border-[#e8ebe3] bg-[#fbfaf6] p-6">
+            <div className="flex flex-col gap-4">
+                <div>
+                    <label htmlFor={`roll-${type}`} className="mb-1 block text-sm font-medium">{t.roll}</label>
+                    <input id={`roll-${type}`} dir="ltr" value={roll} onChange={(e) => setRoll(e.target.value)} required autoComplete="off" className={FIELD} />
+                </div>
+                <div>
+                    <label htmlFor={`reg-${type}`} className="mb-1 block text-sm font-medium">{t.reg}</label>
+                    <input id={`reg-${type}`} dir="ltr" value={reg} onChange={(e) => setReg(e.target.value)} required autoComplete="off" className={FIELD} />
+                </div>
+                <button type="submit" disabled={busy} aria-busy={busy}
+                    className="h-11 rounded-xl bg-[#0f3d2e] text-sm font-semibold text-white transition hover:bg-[#1d5140] disabled:opacity-60">
+                    {busy ? t.finding : t.find}
+                </button>
+            </div>
+        </form>
     );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+function ContactForm({ t, flash }: { t: Copy; flash: PageProps['flash'] }) {
+    const [f, setF] = useState({ name: '', phone: '', topic: t.topics[0] as string, message: '' });
+    const [busy, setBusy] = useState(false);
+    useEffect(() => {
+        if (flash?.contact_success) setF({ name: '', phone: '', topic: t.topics[0], message: '' });
+    }, [flash?.contact_success]); // eslint-disable-line react-hooks/exhaustive-deps
+    const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!f.name.trim() || !f.phone.trim() || !f.message.trim()) return;
+        setBusy(true);
+        router.post('/contact', { ...f, name: f.name.trim(), phone: f.phone.trim(), message: f.message.trim() }, { preserveScroll: true, onFinish: () => setBusy(false) });
+    }
+    return (
+        <form onSubmit={submit} noValidate className="grid gap-4 sm:grid-cols-2">
+            <div><label htmlFor="cName" className="mb-1 block text-sm font-medium">{t.fName}</label><input id="cName" value={f.name} onChange={set('name')} required className={FIELD} /></div>
+            <div><label htmlFor="cPhone" className="mb-1 block text-sm font-medium">{t.fPhone}</label><input id="cPhone" type="tel" dir="ltr" value={f.phone} onChange={set('phone')} required className={FIELD} /></div>
+            <div className="sm:col-span-2">
+                <label htmlFor="cTopic" className="mb-1 block text-sm font-medium">{t.fTopic}</label>
+                <select id="cTopic" value={f.topic} onChange={set('topic')} className={FIELD}>{t.topics.map((x) => <option key={x}>{x}</option>)}</select>
+            </div>
+            <div className="sm:col-span-2">
+                <label htmlFor="cMsg" className="mb-1 block text-sm font-medium">{t.fMsg}</label>
+                <textarea id="cMsg" rows={4} value={f.message} onChange={set('message')} required className="w-full resize-none rounded-xl border border-[#dfe5dc] p-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10" />
+            </div>
+            <div className="sm:col-span-2">
+                <button type="submit" disabled={busy} aria-busy={busy} className="rounded-full bg-[#0f3d2e] px-7 py-3 text-sm font-semibold text-white transition hover:bg-[#1d5140] disabled:opacity-60">
+                    {busy ? t.sending : t.send}
+                </button>
+            </div>
+            <div aria-live="polite" className="sm:col-span-2">
+                {flash?.contact_success && <p role="status" className="rounded-xl bg-[#eef3ec] px-4 py-3 text-sm font-medium text-[#1d5140]">{t.sent}</p>}
+                {flash?.contact_error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{flash.contact_error}</p>}
+            </div>
+        </form>
+    );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Welcome() {
-    const { auth, flash = {} } = usePage<PageProps>().props;
+    const { auth, flash = {}, stats, notices, positionHolders, gallery } = usePage<PageProps>().props;
 
-    // Nav
+    const [lang, setLang] = useState<Lang>('ur');
+    const [navOpen, setNavOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
-    const [navOpen, setNavOpen]   = useState(false);
+    const [q, setQ] = useState('');
+    const [galFilter, setGalFilter] = useState('all');
+    const [tab, setTab] = useState<'internal' | 'wifaq'>('internal');
 
     useEffect(() => {
-        const onScroll = () => setScrolled(window.scrollY > 60);
-        window.addEventListener('scroll', onScroll, { passive: true });
-        return () => window.removeEventListener('scroll', onScroll);
+        try { const s = localStorage.getItem('lang'); if (s === 'en' || s === 'ur') setLang(s); } catch { /* storage unavailable */ }
+    }, []);
+    useEffect(() => {
+        const on = () => setScrolled(window.scrollY > 60);
+        window.addEventListener('scroll', on, { passive: true });
+        return () => window.removeEventListener('scroll', on);
     }, []);
 
-    // Resource search
-    const [resQuery, setResQuery] = useState('');
-    const filteredResources = RESOURCES.filter((r) =>
-        `${r.title} ${r.desc} ${r.keywords}`.toLowerCase().includes(resQuery.trim().toLowerCase()),
-    );
+    const t: Copy = COPY[lang];
+    const ur = lang === 'ur';
+    const switchLang = () => {
+        const next: Lang = ur ? 'en' : 'ur';
+        setLang(next);
+        try { localStorage.setItem('lang', next); } catch { /* ignore */ }
+    };
 
-    // Gallery filter
-    const [galFilter, setGalFilter] = useState('all');
-    const visibleGallery = galFilter === 'all' ? GALLERY : GALLERY.filter((g) => g.cat === galFilter);
+    const hub = t.hub.filter((h) => `${h[0]} ${h[1]} ${h[3]}`.toLowerCase().includes(q.trim().toLowerCase()));
+    const gal = galFilter === 'all' ? gallery : gallery.filter((g) => g.category === galFilter);
+    const featured = positionHolders.find((p) => p.featured) ?? positionHolders[0];
+    const others = positionHolders.filter((p) => p !== featured);
+    const dateLabel = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(ur ? 'ur-PK' : 'en-GB', { day: 'numeric', month: 'short' }) : '');
 
-    // Results tab
-    const [resTab, setResTab] = useState<'internal' | 'wifaq'>('internal');
+    // Nastaliq needs generous line-height or the glyphs collide.
+    const bodyStyle = ur
+        ? { fontFamily: "'Noto Nastaliq Urdu', serif", lineHeight: 2.1 }
+        : { fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1.6 };
+    const headLeading = ur ? 'leading-[1.9]' : 'leading-tight';
 
     return (
         <>
             <Head>
-                <title>مدرسہ دارِ ارقم گرگری</title>
-                <meta name="description" content="مدرسہ دارِ ارقم گرگری — قرآن، حفظ، درسِ نظامی اور عصری تعلیم۔" />
+                <title>{t.heroTitle}</title>
+                <meta name="description" content={t.heroSub} />
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet" />
             </Head>
 
-            <div lang="ur" dir="rtl" className="min-h-screen overflow-x-hidden bg-[#fbfaf6] font-sans text-[#183b32]">
-
-                {/* ── Top bar ─────────────────────────────────────────────── */}
-                <div className="hidden bg-[#173f34] px-4 py-1.5 md:block">
-                    <div className="mx-auto flex max-w-7xl justify-between text-xs text-white/80">
-                        <a href="tel:+923349798988" dir="ltr" className="transition hover:text-white">
-                            00923349798988
-                        </a>
-                        <a href="mailto:qarimuhammadarif988@gmail.com" dir="ltr" className="transition hover:text-white">
-                            qarimuhammadarif988@gmail.com
-                        </a>
+            <div lang={lang} dir={ur ? 'rtl' : 'ltr'} style={bodyStyle} className="min-h-screen overflow-x-hidden bg-[#fbfaf6] text-[#173b30]">
+                {/* top bar */}
+                <div className="hidden bg-[#0f3d2e] px-4 py-1 text-xs text-white/80 md:block">
+                    <div className="mx-auto flex max-w-7xl justify-between" dir="ltr">
+                        <a href={`tel:${PHONE}`} className="hover:text-white">00923349798988</a>
+                        <a href="mailto:qarimuhammadarif988@gmail.com" className="hover:text-white">qarimuhammadarif988@gmail.com</a>
                     </div>
                 </div>
 
-                {/* ── Sticky nav ───────────────────────────────────────────── */}
-                <nav
-                    aria-label="مرکزی نیویگیشن"
-                    className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white/97 shadow-md backdrop-blur-sm' : 'bg-white/92 backdrop-blur-sm'}`}
-                >
-                    <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
-                        <a href="#home" aria-label="مدرسہ دارِ ارقم — صفحۂ اول" className="flex items-center gap-2.5">
-                            <img
-                                src="/madrasa-logo.png"
-                                alt="مدرسہ دارِ ارقم گرگری کا نشان"
-                                className="size-12 shrink-0 rounded-xl bg-[#f7f4e8] object-contain shadow-sm ring-1 ring-[#e5dfca]"
-                            />
+                {/* nav */}
+                <nav aria-label={t.brand} className={`sticky top-0 z-50 bg-white/95 backdrop-blur transition-shadow ${scrolled ? 'shadow-md' : ''}`}>
+                    <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-10">
+                        <a href="#home" className="flex items-center gap-2.5">
+                            <img src="/madrasa-logo.png" alt="" className="size-11 rounded-xl bg-[#f7f4e8] object-contain ring-1 ring-[#e5dfca]" />
                             <span className="flex flex-col leading-tight">
-                                <span className="text-base font-bold text-[#183b32]">مدرسہ دارِ ارقم</span>
-                                <span className="text-[9px] font-semibold uppercase tracking-widest text-[#789087]">Dar-e-Arqam Gurguri</span>
+                                <span className="text-base font-bold text-[#0f3d2e]">{t.brand}</span>
+                                <span className="text-[10px] font-semibold text-[#789087]" dir="ltr">{t.brandSub}</span>
                             </span>
                         </a>
-
-                        {/* Desktop links */}
                         <div className="hidden items-center gap-5 text-sm font-medium text-[#526c61] xl:flex">
-                            {NAV_LINKS.map(([label, href]) => (
-                                <a
-                                    key={href}
-                                    href={href}
-                                    className="relative py-1 transition hover:text-[#1d5140] after:absolute after:bottom-0 after:right-0 after:h-0.5 after:w-0 after:bg-[#1d5140] after:transition-all hover:after:w-full"
-                                >
-                                    {label}
-                                </a>
-                            ))}
+                            {t.nav.map(([l, h]) => <a key={h} href={h} className="py-1 transition hover:text-[#0f3d2e]">{l}</a>)}
                         </div>
-
-                        {/* Portal CTA */}
                         <div className="flex items-center gap-2">
-                            {auth?.user ? (
-                                <Link
-                                    href={dashboard()}
-                                    className="hidden rounded-full bg-[#1d5140] px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-[#173f34] sm:inline-flex items-center gap-2"
-                                >
-                                    ڈیش بورڈ &#8592;
-                                </Link>
-                            ) : (
-                                <Link
-                                    href={login()}
-                                    className="hidden rounded-full border-2 border-[#1d5140] px-5 py-2 text-sm font-semibold text-[#1d5140] transition hover:bg-[#1d5140] hover:text-white sm:inline-flex items-center gap-2"
-                                >
-                                    پورٹل لاگ اِن
-                                </Link>
-                            )}
-                            <button
-                                type="button"
-                                className="flex size-9 items-center justify-center rounded-lg border border-[#e0e4dc] xl:hidden"
-                                onClick={() => setNavOpen((o) => !o)}
-                                aria-label="مینو کھولیں یا بند کریں"
-                                aria-expanded={navOpen}
-                                aria-controls="mobile-nav"
-                            >
-                                <span className="text-[#526c61]">{navOpen ? '✕' : '☰'}</span>
+                            <button type="button" onClick={switchLang} className="rounded-full border border-[#d6dfd7] px-4 py-1.5 text-sm font-semibold text-[#285845] hover:bg-[#f1f5ef]">{t.toggle}</button>
+                            {auth?.user
+                                ? <Link href={dashboard()} className="hidden rounded-full bg-[#0f3d2e] px-5 py-2 text-sm font-semibold text-white sm:inline-flex">{t.dash}</Link>
+                                : <Link href={login()} className="hidden rounded-full bg-[#0f3d2e] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1d5140] sm:inline-flex">{t.portal}</Link>}
+                            <button type="button" className="flex size-9 items-center justify-center rounded-lg border border-[#e0e4dc] xl:hidden"
+                                onClick={() => setNavOpen((o) => !o)} aria-expanded={navOpen} aria-controls="mobile-nav" aria-label="Menu">
+                                {navOpen ? '✕' : '☰'}
                             </button>
                         </div>
                     </div>
-
-                    {/* Mobile menu */}
                     {navOpen && (
-                        <div id="mobile-nav" className="border-t border-[#e7e9e1] bg-white px-4 pb-4 pt-2 xl:hidden">
-                            <nav aria-label="موبائل نیویگیشن" className="flex flex-col gap-1 text-sm font-medium text-[#526c61]">
-                                {NAV_LINKS.map(([label, href]) => (
-                                    <a
-                                        key={href}
-                                        href={href}
-                                        onClick={() => setNavOpen(false)}
-                                        className="rounded-lg px-3 py-2 transition hover:bg-[#f5f7f3] hover:text-[#1d5140]"
-                                    >
-                                        {label}
-                                    </a>
-                                ))}
-                                {auth?.user ? (
-                                    <Link href={dashboard()} className="mt-2 rounded-full bg-[#1d5140] px-4 py-2 text-center text-sm font-semibold text-white">
-                                        ڈیش بورڈ
-                                    </Link>
-                                ) : (
-                                    <Link href={login()} className="mt-2 rounded-full border-2 border-[#1d5140] px-4 py-2 text-center text-sm font-semibold text-[#1d5140]">
-                                        پورٹل لاگ اِن
-                                    </Link>
-                                )}
-                            </nav>
+                        <div id="mobile-nav" className="flex flex-col gap-1 border-t border-[#e7e9e1] bg-white px-4 pb-4 pt-2 text-sm font-medium text-[#526c61] xl:hidden">
+                            {t.nav.map(([l, h]) => <a key={h} href={h} onClick={() => setNavOpen(false)} className="rounded-lg px-3 py-2 hover:bg-[#f5f7f3]">{l}</a>)}
+                            <Link href={auth?.user ? dashboard() : login()} className="mt-2 rounded-full bg-[#0f3d2e] px-4 py-2 text-center font-semibold text-white">{auth?.user ? t.dash : t.portal}</Link>
                         </div>
                     )}
                 </nav>
 
                 <main>
-                    {/* ════════════════════════════════════════════════════════
-                        HERO
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="home" aria-label="مدرسے کا تعارف" className="relative flex min-h-[88vh] flex-col justify-center overflow-hidden">
-                        <HeroCarousel />
-                        <div className="absolute inset-0 z-10 bg-gradient-to-b from-[#0d2b1f]/75 via-[#0d2b1f]/60 to-[#0d2b1f]/88" aria-hidden="true" />
-                        <div className="relative z-20 mx-auto max-w-7xl px-5 pb-28 pt-24 sm:px-8 sm:pt-32 lg:px-10">
+                    {/* hero */}
+                    <section id="home" className="relative flex min-h-[78vh] items-center overflow-hidden">
+                        <Hero t={t} />
+                        <div className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-32 pt-20 sm:px-8 lg:px-10">
                             <div className="max-w-2xl">
-                                <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-2 text-sm font-medium text-white/90 backdrop-blur-sm">
-                                    ✨ داخلہ کھلا ہے — سیشن ۲۰۲۶–۲۰۲۷
-                                </span>
-                                <h1 className="text-4xl font-bold leading-[1.65] text-white sm:text-5xl lg:text-6xl">
-                                    مدرسہ دارِ ارقم گرگری
-                                </h1>
-                                <p className="mt-4 max-w-xl text-base leading-8 text-white/80 sm:text-lg">
-                                    ایک ایسی تعلیمی جگہ جہاں قرآن، اچھا کردار اور مفید علم ایک ساتھ سکھائے جاتے ہیں — ہر طالب علم کی پرواہ کے ساتھ۔
-                                </p>
+                                <span className="inline-block rounded-full border border-white/25 bg-white/10 px-5 py-1 text-sm text-white/90 backdrop-blur">{t.badge}</span>
+                                <h1 className={`mt-4 text-4xl font-bold text-white sm:text-5xl lg:text-6xl ${headLeading}`}>{t.heroTitle}</h1>
+                                <p className="mt-3 max-w-xl text-base text-white/80 sm:text-lg">{t.heroSub}</p>
                                 <div className="mt-7 flex flex-wrap gap-3">
-                                    <a href="#admissions" className="inline-flex items-center gap-2 rounded-full bg-[#2d7a5a] px-7 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#245f46]">
-                                        داخلے کے لیے درخواست
-                                    </a>
-                                    <a href="#results" className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20">
-                                        نتیجہ دیکھیں
-                                    </a>
+                                    <a href="#admissions" className="rounded-full bg-[#2d7a5a] px-7 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-[#245f46]">{t.apply}</a>
+                                    <a href="#results" className="rounded-full border border-white/40 bg-white/10 px-7 py-2.5 text-sm font-semibold text-white backdrop-blur hover:bg-white/20">{t.seeResult}</a>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    {/* ════════════════════════════════════════════════════════
-                        STATS
-                    ════════════════════════════════════════════════════════ */}
-                    <section aria-labelledby="statsHeading" className="bg-[#1d5140]">
-                        <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-10">
-                            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-16">
-                                <h2 id="statsHeading" className="text-xl font-bold text-white/90 lg:w-48 lg:shrink-0">
-                                    اعداد و شمار
-                                </h2>
-                                <div className="grid flex-1 grid-cols-3 divide-x divide-white/20">
-                                    {STATS.map((s) => (
-                                        <div key={s.key} className="flex flex-col items-center gap-1 px-4 py-2 text-center">
-                                            <span className="text-3xl font-bold text-[#e0b66f] sm:text-4xl">
-                                                <AnimatedCounter value={s.value} />+
-                                            </span>
-                                            <span className="text-sm text-white/75">{s.label}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ════════════════════════════════════════════════════════
-                        ABOUT
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="about" className="border-b border-[#ecece4] bg-white">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <SectionHeader
-                                eyebrow="ہمارا تعارف"
-                                title="مدرسے کے بارے میں"
-                                sub="مدرسہ دارِ ارقم گرگری قرآن، حدیث، فقہ اور عربی کے ساتھ اردو، انگریزی اور ریاضی بھی پڑھاتا ہے — تاکہ طلبہ ایمان اور روزمرہ کی مہارتوں میں دونوں ترقی کریں۔"
-                            />
-
-                            {/* Foundation card */}
-                            <div className="mb-8 overflow-hidden rounded-2xl border border-[#d8eed6] bg-[#f0f9ee] p-6 sm:flex sm:items-center sm:gap-6">
-                                <span className="mb-4 flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[#1d5140] text-2xl text-white sm:mb-0" aria-hidden="true">🏛️</span>
-                                <div className="flex-1">
-                                    <p className="text-xs font-semibold uppercase tracking-widest text-[#b57d38]">تاریخِ قیام</p>
-                                    <h3 className="mt-1 text-lg font-bold text-[#183b32]">قیام سنگ بنیاد</h3>
-                                    <p className="mt-1 text-sm text-[#526c61]">بادست</p>
-                                    <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-[#1d5140]">
-                                        <li>• مولانا مقصود گل رحمۃ اللّٰہ علیہ</li>
-                                        <li>• مولانا عبداللّٰہ منتظر صاحب</li>
-                                        <li>• اور علاقائی علماء کرام</li>
-                                    </ul>
-                                </div>
-                                <time className="mt-4 shrink-0 text-2xl font-bold text-[#1d5140] sm:mt-0" dateTime="2020-06-03" dir="ltr">
-                                    03/06/2020
-                                </time>
-                            </div>
-
-                            {/* Bento grid */}
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                <div className="rounded-2xl bg-[#1d5140] p-6 text-white">
-                                    <span className="text-3xl" aria-hidden="true">📖</span>
-                                    <h3 className="mt-4 text-xl font-bold">قرآن اول</h3>
-                                    <p className="mt-2 text-sm leading-6 text-white/80">تلاوت، حفظ اور سمجھ — ہر چیز سے پہلے۔</p>
-                                </div>
-                                <div className="rounded-2xl bg-[#f7f4e8] p-6">
-                                    <span className="text-3xl" aria-hidden="true">❤️</span>
-                                    <h3 className="mt-4 text-xl font-bold text-[#183b32]">کردار سازی</h3>
-                                    <p className="mt-2 text-sm leading-6 text-[#718178]">ادب، دیانت اور احترام روزانہ سکھائے اور پرکھے جاتے ہیں۔</p>
-                                </div>
-                                <div className="rounded-2xl bg-[#f7f4e8] p-6">
-                                    <span className="text-3xl" aria-hidden="true">🎓</span>
-                                    <h3 className="mt-4 text-xl font-bold text-[#183b32]">مفید مہارتیں</h3>
-                                    <p className="mt-2 text-sm leading-6 text-[#718178]">زبانیں، ریاضی اور کمپیوٹر کی بنیادیں — زندگی کے لیے تیاری۔</p>
-                                </div>
-                                <div className="rounded-2xl bg-[#1d5140] p-6 text-white">
-                                    <span className="text-3xl" aria-hidden="true">👥</span>
-                                    <h3 className="mt-4 text-xl font-bold">ہر طالب علم</h3>
-                                    <p className="mt-2 text-sm leading-6 text-white/80">اساتذہ حاضری، تفویضات اور امتحانات پر نظر رکھتے اور والدین کو باخبر رکھتے ہیں۔</p>
-                                </div>
-                                <div className="col-span-1 rounded-2xl border border-[#d8eed6] bg-[#f0f9ee] p-6 sm:col-span-2 lg:col-span-1">
-                                    <p className="text-xl font-bold leading-relaxed text-[#183b32]" lang="ar" dir="rtl">اِقْرَأْ بِاسْمِ رَبِّكَ الَّذِيْ خَلَقَ</p>
-                                    <h3 className="mt-3 font-semibold text-[#1d5140]">ہمارا پہلا سبق</h3>
-                                    <p className="mt-2 text-sm leading-6 text-[#718178]">"اپنے رب کے نام سے پڑھ جس نے پیدا کیا۔" علم قرآن سے شروع ہوتا اور وہیں سے بڑھتا ہے۔</p>
-                                </div>
-                                <div className="relative overflow-hidden rounded-2xl sm:col-span-2 lg:col-span-1">
-                                    <FallbackImg
-                                        src="/storage/gallery/g2.jpg"
-                                        fallback="https://images.unsplash.com/photo-1519817914152-22d216bb9170?w=800&q=70"
-                                        alt="مدرسہ کیمپس"
-                                        className="h-48 w-full object-cover"
-                                    />
-                                    <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 p-4">
-                                        <span className="text-sm font-semibold text-white">قیام ۲۰۲۰ · گرگری</span>
+                    {/* stats, overlapping the hero */}
+                    <section aria-label={t.statsTitle} className="relative z-30 -mt-14 px-5">
+                        <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 sm:flex-row sm:justify-between">
+                            <h2 className={`text-3xl font-bold text-[#0f3d2e] ${headLeading}`}>{t.statsTitle}</h2>
+                            <div className="grid w-full grid-cols-3 gap-3 sm:w-auto sm:min-w-[420px]">
+                                {([['teachers', stats.teachers], ['depts', stats.depts], ['students', stats.students]] as const).map(([k, v]) => (
+                                    <div key={k} className="rounded-2xl bg-white px-4 py-3 text-center shadow-lg ring-1 ring-black/5">
+                                        <div className="text-3xl font-bold text-[#0f3d2e]" dir="ltr"><Counter value={v} /></div>
+                                        <div className="text-xs text-[#5f7268]">{t[k]}</div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ════════════════════════════════════════════════════════
-                        TEACHERS
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="teachers" className="bg-[#fbfaf6]">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <SectionHeader
-                                eyebrow="تدریسی ٹیم"
-                                title="اساتذہ — تعلیم اور رہنمائی"
-                                sub="ہمارے اساتذہ قرآن، دینی نصاب اور مفید عصری مضامین کی تعلیم کے ساتھ طلبہ کی روزانہ تعلیمی پیش رفت میں رہنمائی کرتے ہیں۔"
-                            />
-                            <div className="overflow-hidden rounded-3xl border border-[#e8ebe3] bg-white shadow-sm lg:flex">
-                                <div className="relative bg-[#1d5140] lg:w-72 lg:shrink-0">
-                                    <FallbackImg
-                                        src="/storage/teachers/team.jpg"
-                                        fallback="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=70"
-                                        alt="تدریسی ٹیم"
-                                        className="h-56 w-full object-cover object-top opacity-30 lg:h-full"
-                                    />
-                                    <div className="absolute inset-0 flex flex-col items-center justify-end gap-2 p-6 text-center">
-                                        <div className="text-sm font-semibold text-[#e0b66f]">تدریسی ٹیم</div>
-                                        <h3 className="text-xl font-bold text-white">دارِ ارقم تدریسی ٹیم</h3>
-                                        <p className="text-sm text-white/70">🎓 اسلامی و عصری تعلیم</p>
-                                    </div>
-                                </div>
-                                <div className="flex-1 p-6 sm:p-8">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <span className="text-xs font-semibold uppercase tracking-widest text-[#b57d38]">تدریسی پروفائل</span>
-                                            <h3 className="mt-1 text-xl font-bold text-[#183b32]">کلاسز، مضامین اور رہنمائی</h3>
-                                        </div>
-                                        <span className="flex items-center gap-1 rounded-full bg-[#eef3ec] px-3 py-1 text-xs font-semibold text-[#1d5140]">
-                                            ✅ طالب علم پر توجہ
-                                        </span>
-                                    </div>
-                                    <p className="mt-4 text-sm leading-7 text-[#718178]">
-                                        مدرسے کی تدریسی ٹیم طلبہ کو بنیادی قرآنی تعلیم، دینی نصاب اور ضروری عصری مضامین میں رہنمائی فراہم کرتی ہے۔
-                                    </p>
-                                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                                        {TEACHER_FACTS.map((f) => (
-                                            <div key={f.title} className="flex items-start gap-3">
-                                                <span className="mt-0.5 text-xl" aria-hidden="true">{f.icon}</span>
-                                                <div>
-                                                    <h4 className="text-sm font-semibold text-[#234739]">{f.title}</h4>
-                                                    <p className="mt-0.5 text-sm text-[#718178]">{f.desc}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        <div className="flex items-start gap-3">
-                                            <span className="mt-0.5 text-xl" aria-hidden="true">📞</span>
-                                            <div>
-                                                <h4 className="text-sm font-semibold text-[#234739]">فون / واٹس ایپ</h4>
-                                                <a href="tel:+923349798988" dir="ltr" className="mt-0.5 text-sm text-[#1d5140] hover:underline">
-                                                    00923349798988
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <p className="mt-5 rounded-xl bg-[#f5f7f3] px-4 py-3 text-xs text-[#718178]">
-                                        ℹ️ انفرادی اساتذہ کے نام، مختص کلاسیں اور براہِ راست نمبر مدرسے کی تصدیق کے بعد شامل کیے جاسکتے ہیں۔
-                                    </p>
-                                    <a
-                                        href="#contact"
-                                        className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#d6dfd7] px-5 py-2.5 text-sm font-semibold text-[#285845] transition hover:bg-[#f1f5ef]"
-                                    >
-                                        تدریسی ٹیم کے بارے میں پوچھیں
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ════════════════════════════════════════════════════════
-                        PROGRAMS
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="programs" className="border-y border-[#ecece4] bg-white">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <SectionHeader
-                                eyebrow="ہم کیا پڑھاتے ہیں"
-                                title="تعلیمی شعبے"
-                                sub="شعبے اور کورسز انتظامیہ کے زیرِ انتظام ہیں اور ہر سیشن میں تبدیل ہوسکتے ہیں۔"
-                            />
-                            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                                {PROGRAMS.map((p) => (
-                                    <article
-                                        key={p.num}
-                                        className={`group relative overflow-hidden rounded-2xl p-6 transition duration-300 hover:-translate-y-1 hover:shadow-xl ${p.accent ? 'bg-[#1d5140] text-white' : 'border border-[#e8ebe3] bg-white'}`}
-                                    >
-                                        <span className={`text-4xl font-bold select-none ${p.accent ? 'text-white/15' : 'text-[#e8ece3]'}`} aria-hidden="true">{p.num}</span>
-                                        <h3 className={`mt-4 text-xl font-bold ${p.accent ? 'text-white' : 'text-[#234739]'}`}>{p.title}</h3>
-                                        <p className={`mt-3 text-sm leading-7 ${p.accent ? 'text-white/80' : 'text-[#718178]'}`}>{p.desc}</p>
-                                        <div className={`mt-4 h-1 w-10 rounded ${p.accent ? 'bg-[#e0b66f]' : 'bg-[#2d7a5a]'}`} />
-                                    </article>
                                 ))}
                             </div>
                         </div>
                     </section>
 
-                    {/* ════════════════════════════════════════════════════════
-                        RESOURCES HUB
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="resources" className="bg-[#fbfaf6]">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <SectionHeader
-                                eyebrow="معلومات و رہنمائی"
-                                title="تعلیمی و رہنمائی مرکز"
-                                sub="داخلہ، امتحان، نتائج اور مستند دینی مطالعے کے اہم روابط ایک جگہ تلاش کریں۔"
-                            />
-                            <div className="relative mx-auto mb-6 max-w-xl">
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#789087]" aria-hidden="true">🔍</span>
-                                <label className="sr-only" htmlFor="resourceSearch">معلومات تلاش کریں</label>
-                                <input
-                                    id="resourceSearch"
-                                    type="search"
-                                    value={resQuery}
-                                    onChange={(e) => setResQuery(e.target.value)}
-                                    placeholder="مثلاً داخلہ، نتیجہ، کتابیں"
-                                    className="h-12 w-full rounded-2xl border border-[#dfe5dc] bg-white pr-12 pl-4 text-sm text-[#234739] outline-none placeholder:text-[#9aa69c] focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
-                                />
+                    {/* about */}
+                    <section id="about" className="py-20">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+                            <Title sub={t.aboutSub}>{t.aboutTitle}</Title>
+                            <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-[#d8eed6] bg-[#f0f9ee] p-6 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 className="text-lg font-bold">{t.foundTitle}</h3>
+                                    <p className="text-sm text-[#526c61]">{t.foundBy}: {t.founders.join(' · ')}</p>
+                                </div>
+                                <time dateTime="2020-06-03" dir="ltr" className="text-2xl font-bold text-[#0f3d2e]">03/06/2020</time>
                             </div>
-                            {filteredResources.length > 0 ? (
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                {t.bento.map((b) => (
+                                    <div key={b.t} className={`rounded-2xl p-6 ${'dark' in b && b.dark ? 'bg-[#0f3d2e] text-white' : 'bg-white ring-1 ring-[#e8ebe3]'}`}>
+                                        <h3 className="text-xl font-bold">{b.t}</h3>
+                                        <p className={`mt-2 text-sm ${'dark' in b && b.dark ? 'text-white/80' : 'text-[#5f7268]'}`}>{b.d}</p>
+                                    </div>
+                                ))}
+                                <div className="rounded-2xl border border-[#d8eed6] bg-[#f0f9ee] p-6">
+                                    <p lang="ar" dir="rtl" className="text-xl font-bold">{t.ayah}</p>
+                                    <h3 className="mt-3 font-semibold text-[#1d5140]">{t.ayahT}</h3>
+                                    <p className="mt-1 text-sm text-[#5f7268]">{t.ayahD}</p>
+                                </div>
+                                <div className="relative overflow-hidden rounded-2xl">
+                                    <Img src="/storage/gallery/g2.jpg" fb="https://images.unsplash.com/photo-1519817914152-22d216bb9170?w=800&q=70" alt="" className="h-full min-h-48 w-full object-cover" />
+                                    <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 p-4"><span className="text-sm font-semibold text-white">{t.campus}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* teachers */}
+                    <section id="teachers" className="bg-white py-20">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+                            <Title sub={t.teachersSub}>{t.teachersTitle}</Title>
+                            <div className="overflow-hidden rounded-3xl border border-[#e8ebe3] shadow-sm lg:flex">
+                                <div className="relative bg-[#0f3d2e] lg:w-72 lg:shrink-0">
+                                    <Img src="/storage/teachers/team.jpg" fb="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=70" alt="" className="h-56 w-full object-cover object-top opacity-40 lg:h-full" />
+                                    <h3 className="absolute inset-x-0 bottom-0 p-6 text-center text-xl font-bold text-white">{t.teamName}</h3>
+                                </div>
+                                <div className="flex-1 space-y-4 p-6 sm:p-8">
+                                    {t.facts.map(([h, d]) => (
+                                        <div key={h}><h4 className="text-sm font-semibold">{h}</h4><p className="text-sm text-[#5f7268]">{d}</p></div>
+                                    ))}
+                                    <div><h4 className="text-sm font-semibold">{t.phoneLabel}</h4><a href={`tel:${PHONE}`} dir="ltr" className="text-sm text-[#1d5140] hover:underline">00923349798988</a></div>
+                                    <a href="#contact" className="inline-block rounded-full border border-[#d6dfd7] px-5 py-2 text-sm font-semibold text-[#285845] hover:bg-[#f1f5ef]">{t.askTeam}</a>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* programs */}
+                    <section id="programs" className="py-20">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+                            <Title sub={t.programsSub}>{t.programsTitle}</Title>
+                            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                                {t.programs.map(([h, d], i) => {
+                                    const dark = i % 2 === 1;
+                                    return (
+                                        <article key={h} className={`rounded-2xl p-6 ${dark ? 'bg-[#0f3d2e] text-white' : 'bg-white ring-1 ring-[#e8ebe3]'}`}>
+                                            <h3 className="text-xl font-bold">{h}</h3>
+                                            <p className={`mt-2 text-sm ${dark ? 'text-white/80' : 'text-[#5f7268]'}`}>{d}</p>
+                                            <div className={`mt-4 h-1 w-10 rounded ${dark ? 'bg-[#c9a24b]' : 'bg-[#2d7a5a]'}`} />
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* hub */}
+                    <section id="resources" className="bg-white py-20">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+                            <Title>{t.hubTitle}</Title>
+                            <div className="mx-auto mb-6 max-w-xl">
+                                <label htmlFor="hubSearch" className="sr-only">{t.hubSearch}</label>
+                                <input id="hubSearch" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.hubSearch} className="h-12 w-full rounded-2xl border border-[#dfe5dc] bg-white px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10" />
+                            </div>
+                            {hub.length ? (
                                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                    {filteredResources.map((r) => {
-                                        const cls = 'flex flex-col gap-1 rounded-2xl border border-[#e8ebe3] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#1d5140] hover:shadow-lg';
-                                        const inner = (
-                                            <>
-                                                <span className="text-2xl" aria-hidden="true">{r.icon}</span>
-                                                <strong className="mt-2 text-sm font-bold text-[#234739]">{r.title}</strong>
-                                                <span className="text-xs text-[#718178]">{r.desc}</span>
-                                                {r.external && <span className="mt-1 text-xs text-[#789087]">بیرونی ویب سائٹ ↗</span>}
-                                            </>
-                                        );
-                                        if (r.external)
-                                            return (
-                                                <a key={r.title} href={r.href} target="_blank" rel="noopener noreferrer" className={cls}>
-                                                    {inner}
-                                                </a>
-                                            );
+                                    {hub.map(([h, d, href]) => {
+                                        const ext = href.startsWith('http');
                                         return (
-                                            <a key={r.title} href={r.href} className={cls}>
-                                                {inner}
+                                            <a key={h} href={href} {...(ext ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                                                className="flex flex-col gap-1 rounded-2xl border border-[#e8ebe3] bg-[#fbfaf6] p-5 transition hover:border-[#0f3d2e] hover:shadow-lg">
+                                                <strong className="text-sm font-bold">{h}</strong>
+                                                <span className="text-xs text-[#5f7268]">{d}</span>
+                                                {ext && <span className="text-xs text-[#789087]">{t.external}</span>}
                                             </a>
                                         );
                                     })}
                                 </div>
-                            ) : (
-                                <p className="mt-4 text-center text-sm text-[#718178]" role="status">
-                                    اس تلاش سے متعلق کوئی معلومات نہیں ملیں۔
-                                </p>
-                            )}
+                            ) : <p role="status" className="text-center text-sm text-[#5f7268]">{t.hubEmpty}</p>}
                         </div>
                     </section>
 
-                    {/* ════════════════════════════════════════════════════════
-                        ADMISSIONS
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="admissions" className="border-y border-[#ecece4] bg-white">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:gap-16">
-                                <div>
-                                    <span className="text-sm font-semibold tracking-wide text-[#b57d38]">داخلہ</span>
-                                    <h2 className="mt-2 text-3xl font-bold text-[#183b32] sm:text-4xl">درخواست کا طریقہ</h2>
-                                    <div className="mt-3 h-1 w-14 rounded bg-[#2d7a5a]" />
-                                    <ol className="mt-8 flex flex-col gap-5">
-                                        {ADMISSION_STEPS.map((step, i) => (
-                                            <li key={step.t} className="flex gap-4">
-                                                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#1d5140] text-sm font-bold text-white" aria-hidden="true">
-                                                    {i + 1}
-                                                </span>
-                                                <div>
-                                                    <h3 className="font-bold text-[#234739]">{step.t}</h3>
-                                                    <p className="mt-1 text-sm leading-6 text-[#718178]">{step.d}</p>
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ol>
-                                </div>
-                                <aside className="rounded-3xl bg-[#f7f6ef] p-6 sm:p-8">
-                                    <h3 className="text-xl font-bold text-[#234739]">داخلہ کھلا ہے</h3>
-                                    <p className="mt-3 text-sm leading-7 text-[#718178]">سیشن ۲۰۲۶–۲۰۲۷ کی درخواستیں ماہ کے آخر تک قبول کی جارہی ہیں۔</p>
-                                    <ul className="mt-5 flex flex-col gap-2 text-sm text-[#526c61]" role="list">
-                                        <li className="flex items-center gap-2"><span className="text-[#2d7a5a]">✓</span> لڑکے اور لڑکیوں کے الگ شعبے</li>
-                                        <li className="flex items-center gap-2"><span className="text-[#2d7a5a]">✓</span> ڈے اسکالر اور رہائشی جگہیں</li>
-                                        <li className="flex items-center gap-2"><span className="text-[#2d7a5a]">✓</span> مستحق طلبہ کے لیے فیس میں رعایت</li>
-                                    </ul>
-                                    <a href="#contact" className="mt-6 block rounded-2xl bg-[#1d5140] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#173f34]">
-                                        داخلہ فارم کی درخواست کریں
-                                    </a>
-                                </aside>
+                    {/* admissions */}
+                    <section id="admissions" className="py-20">
+                        <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[1.2fr_0.8fr] lg:gap-16 lg:px-10">
+                            <div>
+                                <h2 className="text-3xl font-bold text-[#0f3d2e] sm:text-4xl">{t.admTitle}</h2>
+                                <div className="mt-3 h-1 w-14 rounded bg-[#c9a24b]" />
+                                <ol className="mt-8 flex flex-col gap-5">
+                                    {t.steps.map(([h, d], i) => (
+                                        <li key={h} className="flex gap-4">
+                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#0f3d2e] text-sm font-bold text-white" aria-hidden="true">{i + 1}</span>
+                                            <div><h3 className="font-bold">{h}</h3><p className="text-sm text-[#5f7268]">{d}</p></div>
+                                        </li>
+                                    ))}
+                                </ol>
                             </div>
+                            <aside className="rounded-3xl bg-[#f3f1e6] p-6 sm:p-8">
+                                <h3 className="text-xl font-bold">{t.admOpen}</h3>
+                                <p className="mt-2 text-sm text-[#5f7268]">{t.admOpenD}</p>
+                                <ul className="mt-4 flex flex-col gap-1 text-sm text-[#526c61]">
+                                    {t.admPoints.map((p) => <li key={p}>✓ {p}</li>)}
+                                </ul>
+                                <a href="#contact" className="mt-6 block rounded-2xl bg-[#0f3d2e] px-5 py-3 text-center text-sm font-semibold text-white hover:bg-[#1d5140]">{t.admBtn}</a>
+                            </aside>
                         </div>
                     </section>
 
-                    {/* ════════════════════════════════════════════════════════
-                        NOTICES + DATE SHEET
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="notices" className="bg-[#fbfaf6]">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <SectionHeader title="نوٹس اور ڈیٹ شیٹ" />
+                    {/* notices + date sheet */}
+                    <section id="notices" className="bg-white py-20">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+                            <Title>{t.noticesTitle}</Title>
                             <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-                                {/* Notices */}
-                                <div className="rounded-2xl border border-[#e8ebe3] bg-white p-6">
-                                    <h3 className="mb-4 font-bold text-[#234739]">تازہ نوٹس</h3>
-                                    <ul className="flex flex-col gap-3">
-                                        {NOTICES.map((n) => (
-                                            <li key={n.title} className="flex items-start gap-3 rounded-xl bg-[#fbfaf6] p-3">
-                                                <span className="shrink-0 text-xs font-semibold text-[#789087]">{n.date}</span>
-                                                <span className="text-sm text-[#234739]">{n.title}</span>
-                                                {n.badge && (
-                                                    <span className={`ms-auto shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${n.badgeGreen ? 'bg-[#eef3ec] text-[#1d5140]' : 'bg-[#f7f4e8] text-[#b57d38]'}`}>
-                                                        {n.badge}
-                                                    </span>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
+                                <div className="rounded-2xl border border-[#e8ebe3] p-6">
+                                    <h3 className="mb-4 font-bold">{t.latest}</h3>
+                                    {notices.length === 0 ? <p className="text-sm text-[#5f7268]">{t.noNotices}</p> : (
+                                        <ul className="flex flex-col gap-3">
+                                            {notices.map((n) => (
+                                                <li key={n.id} className="flex items-start gap-3 rounded-xl bg-[#fbfaf6] p-3">
+                                                    <span className="shrink-0 text-xs font-semibold text-[#789087]">{dateLabel(n.date)}</span>
+                                                    <span className="text-sm">{n.title}</span>
+                                                    {n.is_new && <span className={`ms-auto shrink-0 rounded-full px-2 text-xs font-semibold ${NOTICE_TONE[n.type] ?? NOTICE_TONE.general}`}>{t.newTag}</span>}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
-                                {/* Date sheet */}
-                                <div className="rounded-2xl border border-[#e8ebe3] bg-white p-6">
-                                    <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-                                        <div>
-                                            <h3 className="font-bold text-[#234739]">سالانہ امتحان ڈیٹ شیٹ</h3>
-                                            <p className="text-xs text-[#789087]">کلاس: درسِ نظامی، سال اول</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => window.print()}
-                                            className="flex items-center gap-1.5 rounded-full border border-[#d6dfd7] px-4 py-1.5 text-xs font-semibold text-[#285845] transition hover:bg-[#f1f5ef] print:hidden"
-                                        >
-                                            🖨 پرنٹ
-                                        </button>
+                                <div className="rounded-2xl border border-[#e8ebe3] p-6">
+                                    <div className="mb-4 flex items-start justify-between gap-2">
+                                        <div><h3 className="font-bold">{t.sheetTitle}</h3><p className="text-xs text-[#789087]">{t.sheetClass}</p></div>
+                                        <button type="button" onClick={() => window.print()} className="rounded-full border border-[#d6dfd7] px-4 py-1 text-xs font-semibold text-[#285845] hover:bg-[#f1f5ef] print:hidden">{t.print}</button>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b border-[#ecece4] text-[#526c61]">
-                                                    <th scope="col" className="pb-2 text-right font-semibold">تاریخ</th>
-                                                    <th scope="col" className="pb-2 text-right font-semibold">مضمون</th>
-                                                    <th scope="col" className="pb-2 text-right font-semibold">وقت</th>
-                                                    <th scope="col" className="pb-2 text-right font-semibold">ہال</th>
-                                                </tr>
-                                            </thead>
+                                            <thead><tr className="border-b border-[#ecece4] text-[#526c61]">{t.sheetHead.map((h) => <th key={h} scope="col" className="pb-2 text-start font-semibold">{h}</th>)}</tr></thead>
                                             <tbody>
-                                                {DATE_SHEET.map((row) => (
-                                                    <tr key={row.date} className="border-b border-[#f5f5f0] hover:bg-[#f9faf7]">
-                                                        <td className="py-2 text-[#234739]">{row.date}</td>
-                                                        <td className="py-2 font-medium text-[#1d5140]">{row.subject}</td>
-                                                        <td className="py-2 text-[#718178]" dir="ltr">{row.time}</td>
-                                                        <td className="py-2 text-[#718178]">{row.hall}</td>
+                                                {t.sheet.map((r) => (
+                                                    <tr key={r[0]} className="border-b border-[#f5f5f0] hover:bg-[#f9faf7]">
+                                                        <td className="py-2">{r[0]}</td><td className="py-2 font-medium text-[#1d5140]">{r[1]}</td>
+                                                        <td className="py-2 text-[#5f7268]" dir="ltr">{r[2]}</td><td className="py-2 text-[#5f7268]">{r[3]}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -833,488 +676,132 @@ export default function Welcome() {
                         </div>
                     </section>
 
-                    {/* ════════════════════════════════════════════════════════
-                        RESULTS
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="results" className="border-y border-[#ecece4] bg-white">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <SectionHeader
-                                eyebrow="نتائج"
-                                title="اپنا نتیجہ دیکھیں"
-                                sub="رول نمبر اور رجسٹریشن نمبر درج کریں جو آپ کی رول سلپ پر لکھا ہے۔"
-                            />
-                            {/* Tabs */}
-                            <div className="mb-6 flex gap-2" role="tablist" aria-label="امتحان کی قسم">
-                                {(['internal', 'wifaq'] as const).map((tab) => (
-                                    <button
-                                        key={tab}
-                                        type="button"
-                                        role="tab"
-                                        aria-selected={resTab === tab}
-                                        aria-controls={`panel-${tab}`}
-                                        id={`tab-${tab}`}
-                                        onClick={() => setResTab(tab)}
-                                        className={`rounded-full px-6 py-2 text-sm font-semibold transition ${resTab === tab ? 'bg-[#1d5140] text-white shadow' : 'border border-[#dce0d8] text-[#526c61] hover:border-[#1d5140] hover:text-[#1d5140]'}`}
-                                    >
-                                        {tab === 'internal' ? 'داخلی امتحان' : 'وفاق المدارس'}
+                    {/* results */}
+                    <section id="results" className="py-20">
+                        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+                            <Title sub={t.resSub}>{t.resTitle}</Title>
+                            <div className="mb-6 flex gap-2" role="tablist">
+                                {(['internal', 'wifaq'] as const).map((k) => (
+                                    <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+                                        className={`rounded-full px-6 py-2 text-sm font-semibold transition ${tab === k ? 'bg-[#0f3d2e] text-white' : 'border border-[#dce0d8] text-[#526c61] hover:border-[#0f3d2e]'}`}>
+                                        {k === 'internal' ? t.tabInternal : t.tabWifaq}
                                     </button>
                                 ))}
                             </div>
-
-                            {resTab === 'internal' && (
-                                <div id="panel-internal" role="tabpanel" aria-labelledby="tab-internal" className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-                                    <ResultForm
-                                        type="internal"
-                                        label="داخلی امتحان"
-                                        labelColor="green"
-                                        rollPlaceholder="2026-001"
-                                        regPlaceholder="REG-2026-0001"
-                                        hint="آزمائش: 2026-001 اور REG-2026-0001"
-                                    />
-                                    <div aria-live="polite" aria-atomic="true">
-                                        {flash.result_error && (
-                                            <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert">
-                                                {flash.result_error}
-                                            </div>
-                                        )}
-                                        {flash.result_data && <ResultCard data={flash.result_data} />}
-                                    </div>
+                            <div role="tabpanel" className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+                                <ResultForm key={tab} type={tab} t={t} />
+                                <div aria-live="polite">
+                                    {(tab === 'internal' ? flash.result_error : flash.wifaq_error) && (
+                                        <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">{tab === 'internal' ? flash.result_error : flash.wifaq_error}</p>
+                                    )}
+                                    {(() => { const d = tab === 'internal' ? flash.result_data : flash.wifaq_data; return d ? <ResultCard d={d} t={t} /> : null; })()}
                                 </div>
-                            )}
-
-                            {resTab === 'wifaq' && (
-                                <div id="panel-wifaq" role="tabpanel" aria-labelledby="tab-wifaq" className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-                                    <ResultForm
-                                        type="wifaq"
-                                        label="وفاق المدارس"
-                                        labelColor="gold"
-                                        rollPlaceholder="WM-2026-001"
-                                        regPlaceholder="WRG-2026-0001"
-                                        hint="آزمائش: WM-2026-001 اور WRG-2026-0001"
-                                    />
-                                    <div aria-live="polite" aria-atomic="true">
-                                        {flash.wifaq_error && (
-                                            <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert">
-                                                {flash.wifaq_error}
-                                            </div>
-                                        )}
-                                        {flash.wifaq_data && <ResultCard data={flash.wifaq_data} />}
-                                    </div>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     </section>
 
-                    {/* ════════════════════════════════════════════════════════
-                        POSITION HOLDERS
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="positionHolders" className="bg-[#fbfaf6]">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <SectionHeader
-                                eyebrow="ہمارے ستارے"
-                                title="پوزیشن ہولڈرز"
-                                sub="وہ طلبہ جنہوں نے داخلی اور وفاق المدارس کے امتحانات میں نمایاں کامیابی حاصل کی۔"
-                            />
-                            <div className="grid gap-5 lg:grid-cols-2">
-                                {/* Featured */}
-                                {POSITION_HOLDERS.filter((p) => p.featured).map((p) => (
-                                    <article key={p.name} className="overflow-hidden rounded-3xl border border-[#e8ebe3] bg-white shadow-md">
-                                        <div className="relative h-56 overflow-hidden">
-                                            <FallbackImg src={p.img} fallback={p.imgFallback} alt={p.name} className="h-full w-full object-cover object-top" />
+                    {/* position holders (from DB) */}
+                    <section id="positionHolders" className="bg-white py-20">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+                            <Title sub={t.posSub}>{t.posTitle}</Title>
+                            {!featured ? <p className="text-center text-sm text-[#5f7268]">{t.noPos}</p> : (
+                                <div className="grid gap-5 lg:grid-cols-2">
+                                    <article className="overflow-hidden rounded-3xl border border-[#e8ebe3] shadow-md">
+                                        <div className="relative h-60">
+                                            {featured.photo
+                                                ? <Img src={featured.photo} alt={featured.name} className="h-full w-full object-cover object-top" />
+                                                : <div className="h-full w-full bg-[#0f3d2e]" />}
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                            <span className={`absolute right-4 top-4 rounded-full px-3 py-1 text-xs font-bold ${badgeCls(p.badgeColor)}`}>
-                                                🏆 {p.badge}
-                                            </span>
-                                            <span className="absolute left-4 top-4 rounded-full bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                                                {p.exam}
-                                            </span>
+                                            <span className={`absolute end-4 top-4 rounded-full px-3 text-xs font-bold text-white ${RANK_TONE[featured.rank]}`}>{t.ranks[featured.rank]}</span>
+                                            <span className="absolute start-4 top-4 rounded-full bg-black/40 px-3 text-xs font-semibold text-white backdrop-blur">{t.exams[featured.exam]}</span>
                                         </div>
                                         <div className="p-6">
-                                            <h3 className="text-2xl font-bold text-[#183b32]">{p.name}</h3>
-                                            <p className="mt-1 text-sm text-[#718178]">والد: {p.father}</p>
-                                            <p className="text-sm text-[#718178]">{p.course}</p>
-                                            <div className="mt-4 flex gap-6">
-                                                <div className="text-center">
-                                                    <p className="text-2xl font-bold text-[#1d5140]">
-                                                        {p.marks}<span className="text-sm text-[#789087]">/{p.total}</span>
-                                                    </p>
-                                                    <p className="text-xs text-[#789087]">نمبر</p>
-                                                </div>
-                                                <div className="text-center">
-                                                    <p className="text-2xl font-bold text-[#1d5140]">{p.pct}<span className="text-sm">%</span></p>
-                                                    <p className="text-xs text-[#789087]">فیصد</p>
-                                                </div>
-                                                {'grade' in p && (
-                                                    <div className="text-center">
-                                                        <p className="text-2xl font-bold text-[#1d5140]">{(p as typeof p & { grade: string }).grade}</p>
-                                                        <p className="text-xs text-[#789087]">گریڈ</p>
-                                                    </div>
-                                                )}
+                                            <h3 className="text-2xl font-bold">{featured.name}</h3>
+                                            <p className="text-sm text-[#5f7268]">{featured.father ? `${t.father}: ${featured.father} · ` : ''}{featured.course}</p>
+                                            <div className="mt-4 flex gap-6 text-center" dir="ltr">
+                                                <div><p className="text-2xl font-bold text-[#0f3d2e]">{featured.marks}<span className="text-sm text-[#789087]">/{featured.total}</span></p><p className="text-xs text-[#789087]">{t.marks}</p></div>
+                                                <div><p className="text-2xl font-bold text-[#0f3d2e]">{featured.pct}%</p><p className="text-xs text-[#789087]">{t.percent}</p></div>
+                                                <div><p className="text-2xl font-bold text-[#0f3d2e]">{featured.grade}</p><p className="text-xs text-[#789087]">{t.gradeL}</p></div>
                                             </div>
-                                            {p.quote && (
-                                                <blockquote className="mt-4 border-r-4 border-[#2d7a5a] pr-4 text-sm italic text-[#718178]">
-                                                    {p.quote}
-                                                </blockquote>
-                                            )}
+                                            {featured.quote && <blockquote className="mt-4 border-s-4 border-[#2d7a5a] ps-4 text-sm text-[#5f7268]">{featured.quote}</blockquote>}
                                         </div>
                                     </article>
-                                ))}
-                                {/* Side cards */}
-                                <div className="flex flex-col gap-4">
-                                    {POSITION_HOLDERS.filter((p) => !p.featured).map((p) => (
-                                        <article key={p.name} className="flex overflow-hidden rounded-2xl border border-[#e8ebe3] bg-white shadow-sm">
-                                            <div className="relative w-28 shrink-0">
-                                                <FallbackImg src={p.img} fallback={p.imgFallback} alt={p.name} className="h-full w-full object-cover object-top" />
-                                                <span className={`absolute right-1 top-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${badgeCls(p.badgeColor)}`}>
-                                                    {p.badge}
-                                                </span>
-                                            </div>
-                                            <div className="flex-1 p-4">
-                                                <span className="rounded-full bg-[#eef3ec] px-2 py-0.5 text-[10px] font-semibold text-[#1d5140]">{p.exam}</span>
-                                                <h3 className="mt-1 font-bold text-[#183b32]">{p.name}</h3>
-                                                <p className="text-xs text-[#718178]">{p.course}</p>
-                                                <div className="mt-2 flex gap-4 text-sm">
-                                                    <span className="font-bold text-[#1d5140]">
-                                                        {p.marks}<span className="text-xs text-[#789087]">/{p.total}</span>
-                                                    </span>
-                                                    <span className="font-bold text-[#1d5140]">{p.pct}%</span>
+                                    <div className="flex flex-col gap-4">
+                                        {others.map((p) => (
+                                            <article key={p.id} className="flex overflow-hidden rounded-2xl border border-[#e8ebe3]">
+                                                <div className="relative w-28 shrink-0 bg-[#0f3d2e]">
+                                                    {p.photo && <Img src={p.photo} alt={p.name} className="h-full w-full object-cover object-top" />}
+                                                    <span className={`absolute end-1 top-1 rounded-full px-2 text-[10px] font-bold text-white ${RANK_TONE[p.rank]}`}>{t.ranks[p.rank]}</span>
                                                 </div>
-                                            </div>
-                                        </article>
+                                                <div className="flex-1 p-4">
+                                                    <span className="rounded-full bg-[#eef3ec] px-2 text-[11px] font-semibold text-[#1d5140]">{t.exams[p.exam]}</span>
+                                                    <h3 className="mt-1 font-bold">{p.name}</h3>
+                                                    <p className="text-xs text-[#5f7268]">{p.course}</p>
+                                                    <p className="mt-1 text-sm font-bold text-[#0f3d2e]" dir="ltr">{p.marks}/{p.total} · {p.pct}%</p>
+                                                </div>
+                                            </article>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* gallery (from DB) */}
+                    <section id="gallery" className="py-20">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+                            <Title>{t.galTitle}</Title>
+                            <div className="mb-6 flex flex-wrap gap-2" role="tablist">
+                                {t.galFilters.map(([v, l]) => (
+                                    <button key={v} type="button" role="tab" aria-selected={galFilter === v} onClick={() => setGalFilter(v)}
+                                        className={`rounded-full px-5 py-1.5 text-sm font-semibold transition ${galFilter === v ? 'bg-[#0f3d2e] text-white' : 'border border-[#dce0d8] text-[#526c61] hover:border-[#0f3d2e]'}`}>{l}</button>
+                                ))}
+                            </div>
+                            {gal.length === 0 ? <p className="text-center text-sm text-[#5f7268]">{t.noGal}</p> : (
+                                <div className="grid auto-rows-[200px] grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                                    {gal.map((g) => (
+                                        <figure key={g.id} className={`group relative overflow-hidden rounded-2xl ${g.layout === 'wide' ? 'col-span-2' : ''} ${g.layout === 'tall' ? 'row-span-2' : ''}`}>
+                                            <Img src={g.url} alt={g.label} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                                            <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-xs font-semibold text-white">{g.label}</figcaption>
+                                        </figure>
                                     ))}
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </section>
 
-                    {/* ════════════════════════════════════════════════════════
-                        GALLERY
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="gallery" className="border-y border-[#ecece4] bg-white">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <SectionHeader
-                                eyebrow="ہمارا کیمپس"
-                                title="مدرسے کی زندگی"
-                                sub="روزمرہ سیکھنے، کیمپس کی زندگی اور یادگار لمحات کی ایک جھلک۔"
-                            />
-                            {/* Filter tabs */}
-                            <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="گیلری فلٹر">
-                                {GALLERY_FILTERS.map(([val, label]) => (
-                                    <button
-                                        key={val}
-                                        type="button"
-                                        role="tab"
-                                        aria-selected={galFilter === val}
-                                        onClick={() => setGalFilter(val)}
-                                        className={`rounded-full px-5 py-2 text-sm font-semibold transition ${galFilter === val ? 'bg-[#1d5140] text-white' : 'border border-[#dce0d8] text-[#526c61] hover:border-[#1d5140] hover:text-[#1d5140]'}`}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-                            {/* Masonry grid */}
-                            <div className="grid auto-rows-[200px] grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-                                {visibleGallery.map((img, idx) => (
-                                    <div
-                                        key={`${img.src}-${idx}`}
-                                        className={`group relative overflow-hidden rounded-2xl ${img.wide ? 'col-span-2' : ''} ${img.tall ? 'row-span-2' : ''}`}
-                                    >
-                                        <FallbackImg
-                                            src={img.src}
-                                            fallback={img.fallback}
-                                            alt={img.label}
-                                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                        />
-                                        <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 to-transparent p-3 opacity-0 transition group-hover:opacity-100">
-                                            <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                                                {img.label}
-                                            </span>
+                    {/* contact */}
+                    <section id="contact" className="bg-white py-20">
+                        <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16 lg:px-10">
+                            <div>
+                                <h2 className="text-3xl font-bold text-[#0f3d2e] sm:text-4xl">{t.contactTitle}</h2>
+                                <div className="mt-3 h-1 w-14 rounded bg-[#c9a24b]" />
+                                <address className="mt-8 flex flex-col gap-4 not-italic">
+                                    {t.contact.map(([h, v]) => (
+                                        <div key={h}>
+                                            <p className="font-semibold">{h}</p>
+                                            {/@/.test(v) ? <a href={`mailto:${v}`} dir="ltr" className="text-sm text-[#1d5140] hover:underline">{v}</a>
+                                                : /^0092/.test(v) ? <a href={`tel:${PHONE}`} dir="ltr" className="text-sm text-[#1d5140] hover:underline">{v}</a>
+                                                : <p className="text-sm text-[#5f7268]">{v}</p>}
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </address>
                             </div>
-                        </div>
-                    </section>
-
-                    {/* ════════════════════════════════════════════════════════
-                        CONTACT
-                    ════════════════════════════════════════════════════════ */}
-                    <section id="contact" className="bg-[#fbfaf6]">
-                        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-                            <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
-                                <div>
-                                    <span className="text-sm font-semibold tracking-wide text-[#b57d38]">رابطہ</span>
-                                    <h2 className="mt-2 text-3xl font-bold text-[#183b32] sm:text-4xl">ہم سے رابطہ کریں</h2>
-                                    <div className="mt-3 h-1 w-14 rounded bg-[#2d7a5a]" />
-                                    <address className="mt-8 flex flex-col gap-5 not-italic">
-                                        {CONTACT_INFO.map((c) => (
-                                            <div key={c.title} className="flex items-start gap-3">
-                                                <span className="mt-0.5 text-xl" aria-hidden="true">{c.icon}</span>
-                                                <div>
-                                                    <p className="font-semibold text-[#234739]">{c.title}</p>
-                                                    {c.href ? (
-                                                        <a href={c.href} dir={c.ltr ? 'ltr' : undefined} className="text-sm text-[#1d5140] transition hover:underline">
-                                                            {c.val}
-                                                        </a>
-                                                    ) : (
-                                                        <p className="text-sm text-[#718178]">{c.val}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </address>
-                                    <div className="mt-6 flex h-32 items-center justify-center rounded-2xl border border-dashed border-[#c8d4c3] bg-[#f0f9ee] text-sm text-[#789087]" aria-label="نقشہ">
-                                        🗺 نقشہ یہاں شامل کیا جائے گا
-                                    </div>
-                                </div>
-                                {/* Contact form */}
-                                <div className="rounded-3xl border border-[#e8ebe3] bg-white p-6 sm:p-8">
-                                    <h3 className="mb-5 text-xl font-bold text-[#234739]">پیغام بھیجیں</h3>
-                                    <ContactForm flash={flash} />
-                                </div>
+                            <div className="rounded-3xl border border-[#e8ebe3] bg-[#fbfaf6] p-6 sm:p-8">
+                                <ContactForm key={lang} t={t} flash={flash} />
                             </div>
                         </div>
                     </section>
                 </main>
 
-                {/* ── Footer ───────────────────────────────────────────────── */}
-                <footer className="border-t border-[#e7e9e1] bg-[#f6f6f0]">
-                    <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-6 text-sm text-[#718178] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-                        <a href="#home" className="font-bold text-[#315445] transition hover:text-[#b57d38]">
-                            مدرسہ دارِ ارقم گرگری
-                        </a>
-                        <p>قرآن کی تعلیم، علم کی جستجو اور اچھے کردار کی تربیت۔</p>
-                        <a href="#home" className="transition hover:text-[#315445]">واپس اوپر ↑</a>
+                <footer className="bg-[#0f3d2e] text-white/80">
+                    <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-6 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+                        <a href="#home" className="font-bold text-white">{t.heroTitle}</a>
+                        <p>{t.footer}</p>
+                        <a href="#home" className="hover:text-white">{t.top}</a>
                     </div>
                 </footer>
             </div>
         </>
-    );
-}
-
-// ─── Static constant data (kept outside component to avoid re-creation) ───────
-
-const NAV_LINKS: [string, string][] = [
-    ['تعارف', '#about'],
-    ['شعبے', '#programs'],
-    ['اساتذہ', '#teachers'],
-    ['داخلہ', '#admissions'],
-    ['نوٹس', '#notices'],
-    ['نتائج', '#results'],
-    ['رابطہ', '#contact'],
-];
-
-const TEACHER_FACTS = [
-    { icon: '📔', title: 'پڑھائی جانے والی کلاسیں', desc: 'ناظرہ · حفظ · تجوید · درسِ نظامی' },
-    { icon: '📖', title: 'مضامین', desc: 'قرآن، حدیث، فقہ، عربی، اردو، انگریزی اور ریاضی' },
-    { icon: '👥', title: 'طالب علم و والدین کی مدد', desc: 'پیش رفت، حاضری، اسیسمنٹ اور والدین سے ملاقات' },
-];
-
-const ADMISSION_STEPS = [
-    { t: 'درخواست فارم پُر کریں', d: 'طالب علم اور سرپرست کی تفصیل کے ساتھ داخلہ فارم مکمل کریں۔' },
-    { t: 'دستاویزات جمع کرائیں', d: 'بی فارم یا شناختی کارڈ، دو تصاویر اور سابقہ سرٹیفکیٹ (اگر ہو)۔' },
-    { t: 'اساتذہ سے ملاقات', d: 'مختصر انٹرویو اور سطح کا امتحان مناسب کلاس کا تعین کرتا ہے۔' },
-    { t: 'داخلہ نمبر حاصل کریں', d: 'منظوری کے بعد رجسٹریشن نمبر اور طالب علم کارڈ ملتا ہے۔' },
-];
-
-const GALLERY_FILTERS: [string, string][] = [
-    ['all', 'سب'], ['quran', 'قرآن'], ['campus', 'کیمپس'], ['events', 'تقاریب'],
-];
-
-const CONTACT_INFO = [
-    { icon: '📍', title: 'پتہ', val: 'گرگری، پاکستان' },
-    { icon: '📞', title: 'فون / واٹس ایپ', val: '00923349798988', href: 'tel:+923349798988', ltr: true },
-    { icon: '✉️', title: 'ای میل', val: 'qarimuhammadarif988@gmail.com', href: 'mailto:qarimuhammadarif988@gmail.com', ltr: true },
-    { icon: '🕐', title: 'دفتری اوقات', val: 'ہفتہ تا جمعرات، صبح ۸ تا دوپہر ۲' },
-];
-
-// ─── Result form (uses Inertia router.post — no fake setTimeout) ───────────────
-
-interface ResultFormProps {
-    type: 'internal' | 'wifaq';
-    label: string;
-    labelColor: 'green' | 'gold';
-    rollPlaceholder: string;
-    regPlaceholder: string;
-    hint: string;
-}
-
-function ResultForm({ type, label, labelColor, rollPlaceholder, regPlaceholder, hint }: ResultFormProps) {
-    const [roll, setRoll] = useState('');
-    const [reg,  setReg]  = useState('');
-    const [busy, setBusy] = useState(false);
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!roll.trim() || !reg.trim()) return;
-        setBusy(true);
-        // Posts to POST /results/{type} — wire up the route in routes/web.php
-        // The controller returns back()->with("${type}_data", ...) or "${type}_error"
-        router.post(
-            `/results/${type}`,
-            { roll: roll.trim(), reg: reg.trim() },
-            {
-                preserveScroll: true,
-                onFinish: () => setBusy(false),
-            },
-        );
-    }
-
-    const badgeClass = labelColor === 'green'
-        ? 'bg-[#eef3ec] text-[#1d5140]'
-        : 'bg-[#f7f4e8] text-[#b57d38]';
-
-    return (
-        <form onSubmit={handleSubmit} noValidate className="rounded-2xl border border-[#e8ebe3] bg-[#fbfaf6] p-6">
-            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
-                {labelColor === 'green' ? '🏫' : '🏛'} {label}
-            </span>
-            <div className="mt-4 flex flex-col gap-4">
-                <div>
-                    <label htmlFor={`roll-${type}`} className="mb-1 block text-sm font-medium text-[#234739]">رول نمبر</label>
-                    <input
-                        id={`roll-${type}`}
-                        type="text"
-                        dir="ltr"
-                        placeholder={rollPlaceholder}
-                        value={roll}
-                        onChange={(e) => setRoll(e.target.value)}
-                        required
-                        autoComplete="off"
-                        className="h-11 w-full rounded-xl border border-[#dfe5dc] bg-white px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
-                    />
-                </div>
-                <div>
-                    <label htmlFor={`reg-${type}`} className="mb-1 block text-sm font-medium text-[#234739]">رجسٹریشن نمبر</label>
-                    <input
-                        id={`reg-${type}`}
-                        type="text"
-                        dir="ltr"
-                        placeholder={regPlaceholder}
-                        value={reg}
-                        onChange={(e) => setReg(e.target.value)}
-                        required
-                        autoComplete="off"
-                        className="h-11 w-full rounded-xl border border-[#dfe5dc] bg-white px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
-                    />
-                </div>
-                <button
-                    type="submit"
-                    disabled={busy}
-                    className="h-11 w-full rounded-xl bg-[#1d5140] text-sm font-semibold text-white transition hover:bg-[#173f34] disabled:cursor-not-allowed disabled:opacity-60"
-                    aria-busy={busy}
-                >
-                    {busy ? 'تلاش جاری ہے…' : 'نتیجہ دیکھیں'}
-                </button>
-            </div>
-            <p className="mt-3 text-xs text-[#789087]">{hint}</p>
-        </form>
-    );
-}
-
-// ─── Contact form (uses Inertia router.post — CSRF handled automatically) ─────
-
-function ContactForm({ flash }: { flash: PageProps['flash'] }) {
-    const [name,  setName]  = useState('');
-    const [phone, setPhone] = useState('');
-    const [topic, setTopic] = useState('داخلہ');
-    const [msg,   setMsg]   = useState('');
-    const [busy,  setBusy]  = useState(false);
-
-    // Clear fields after a successful send
-    useEffect(() => {
-        if (flash?.contact_success) {
-            setName(''); setPhone(''); setMsg(''); setTopic('داخلہ');
-        }
-    }, [flash?.contact_success]);
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!name.trim() || !phone.trim() || !msg.trim()) return;
-        setBusy(true);
-        // Posts to POST /contact — add this route in routes/web.php
-        router.post(
-            '/contact',
-            { name: name.trim(), phone: phone.trim(), topic, message: msg.trim() },
-            {
-                preserveScroll: true,
-                onFinish: () => setBusy(false),
-            },
-        );
-    }
-
-    return (
-        <form onSubmit={handleSubmit} noValidate>
-            <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <label htmlFor="cName" className="mb-1 block text-sm font-medium text-[#234739]">آپ کا نام</label>
-                    <input
-                        id="cName"
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        className="h-11 w-full rounded-xl border border-[#dfe5dc] px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
-                    />
-                </div>
-                <div>
-                    <label htmlFor="cPhone" className="mb-1 block text-sm font-medium text-[#234739]">موبائل نمبر</label>
-                    <input
-                        id="cPhone"
-                        type="tel"
-                        dir="ltr"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        required
-                        className="h-11 w-full rounded-xl border border-[#dfe5dc] px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
-                    />
-                </div>
-                <div className="sm:col-span-2">
-                    <label htmlFor="cTopic" className="mb-1 block text-sm font-medium text-[#234739]">موضوع</label>
-                    <select
-                        id="cTopic"
-                        value={topic}
-                        onChange={(e) => setTopic(e.target.value)}
-                        className="h-11 w-full rounded-xl border border-[#dfe5dc] px-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
-                    >
-                        {['داخلہ', 'فیس', 'نتائج', 'دیگر'].map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                </div>
-                <div className="sm:col-span-2">
-                    <label htmlFor="cMsg" className="mb-1 block text-sm font-medium text-[#234739]">پیغام</label>
-                    <textarea
-                        id="cMsg"
-                        rows={4}
-                        value={msg}
-                        onChange={(e) => setMsg(e.target.value)}
-                        required
-                        className="w-full resize-none rounded-xl border border-[#dfe5dc] p-4 text-sm outline-none focus:border-[#1d5140] focus:ring-4 focus:ring-[#1d5140]/10"
-                    />
-                </div>
-                <div className="sm:col-span-2">
-                    <button
-                        type="submit"
-                        disabled={busy}
-                        aria-busy={busy}
-                        className="rounded-full bg-[#1d5140] px-7 py-3 text-sm font-semibold text-white transition hover:bg-[#173f34] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {busy ? 'بھیجا جارہا ہے…' : 'پیغام بھیجیں'}
-                    </button>
-                </div>
-            </div>
-            {/* Server-driven flash messages */}
-            <div aria-live="polite" aria-atomic="true" className="mt-4">
-                {flash?.contact_success && (
-                    <div className="rounded-xl bg-[#eef3ec] px-4 py-3 text-sm font-medium text-[#1d5140]" role="status">
-                        ✅ آپ کا پیغام موصول ہوگیا۔ جلد رابطہ کیا جائے گا۔
-                    </div>
-                )}
-                {flash?.contact_error && (
-                    <div className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
-                        {flash.contact_error}
-                    </div>
-                )}
-            </div>
-        </form>
     );
 }

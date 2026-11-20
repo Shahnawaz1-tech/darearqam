@@ -11,16 +11,11 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ResultController;
 use App\Http\Controllers\RoleDashboardController;
 use App\Http\Controllers\TenantController;
+use App\Http\Controllers\WelcomeController;
 use App\Http\Middleware\RequireTenantRole;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/', function (Request $request) {
-    return $request->user()
-        ? to_route('dashboard')
-        : Inertia::render('welcome');
-})->name('home');
+Route::get('/', WelcomeController::class)->name('home');
 
 // Public form endpoints — no auth required
 Route::post('contact', ContactController::class)->name('contact.send');
