@@ -85,7 +85,7 @@ export function HomeworkList({ items, t }: { items: Homework[]; t: StudentCopy }
     </>;
 }
 
-export function HoursChart({ data, thisWeek, lastWeek, t }: { data: { label: string; hours: number; lastWeekHours: number }[]; thisWeek: number; lastWeek: number; t: StudentCopy }) {
+export function HoursChart({ data, thisWeek, lastWeek, t }: { data: { label: string; date: string; hours: number; lastWeekHours: number }[]; thisWeek: number; lastWeek: number; t: StudentCopy }) {
     const max = Math.max(1, ...data.flatMap((day) => [day.hours, day.lastWeekHours]));
     return <div><div className="mb-4 flex flex-wrap gap-2"><span className="rounded-full bg-[var(--brand-soft)] px-3 py-1 text-xs text-[var(--brand)]">{t.thisWeek}: {thisWeek}h</span><span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">{t.lastWeek}: {lastWeek}h</span></div>
         {data.length ? <div className="flex h-40 items-end justify-around gap-1" role="img" aria-label={`${t.hours}: ${thisWeek} ${t.thisWeek}, ${lastWeek} ${t.lastWeek}`}>
