@@ -12,8 +12,6 @@ import React, { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,11 +80,6 @@ interface FormErrors {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Admin Dashboard', href: '/admin/dashboard' },
-    { title: 'Students', href: '/admin/students' },
-];
 
 const statusBadge: Record<string, string> = {
     active: 'bg-emerald-100 text-emerald-700',
@@ -370,10 +363,9 @@ export default function Students({ students, classes, filters }: Props) {
     // ─── Render ──────────────────────────────────────────────────────────────
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <>
             <Head title="Students" />
-
-            <main className="flex flex-1 flex-col gap-5 bg-[#fbfaf6] p-4 md:p-6 lg:p-8">
+            <main className="min-h-[calc(100svh-72px)] flex flex-col gap-5 bg-[#f5f7f6] p-3 sm:p-5 lg:p-7">
 
                 {/* ── Page header ──────────────────────────────────────────── */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -709,6 +701,6 @@ export default function Students({ students, classes, filters }: Props) {
                     )}
                 </div>
             </main>
-        </AppLayout>
+        </>
     );
 }

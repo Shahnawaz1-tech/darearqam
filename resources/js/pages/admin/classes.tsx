@@ -1,9 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/input-error';
-import type { BreadcrumbItem } from '@/types';
 import {
     PlusCircle,
     BookOpen,
@@ -87,11 +85,6 @@ const TYPE_STYLES: Record<
         label: 'General',
     },
 };
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Admin Dashboard', href: '/admin/dashboard' },
-    { title: 'Classes', href: '/admin/classes' },
-];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -508,10 +501,10 @@ export default function ClassesPage({ classes }: Props) {
     const [showAddForm, setShowAddForm] = useState(false);
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <>
             <Head title="Classes" />
-
-            <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <main className="min-h-[calc(100svh-72px)] bg-[#f5f7f6] px-3 py-5 sm:px-5 lg:px-7">
+            <div className="mx-auto max-w-[1600px] space-y-6">
                 {/* Page header */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -563,6 +556,7 @@ export default function ClassesPage({ classes }: Props) {
                     </div>
                 )}
             </div>
-        </AppLayout>
+            </main>
+        </>
     );
 }

@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ResultController;
 use App\Http\Controllers\RoleDashboardController;
 use App\Http\Controllers\TenantController;
+use App\Http\Middleware\RequireTenantRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -30,7 +31,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     // ── Admin-only module routes ──────────────────────────────────────────
-    Route::middleware('tenant.role:owner,admin')->group(function () {
+    Route::middleware(RequireTenantRole::class.':owner,admin')->group(function () {
+        Route::redirect('admin/student', '/admin/students')->name('admin.student.redirect');
         // Admin stats dashboard
         Route::get('admin/dashboard', DashboardStatsController::class)
             ->name('admin.dashboard');
@@ -63,20 +65,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('admin/notices/{notice}', [NoticeController::class, 'update'])->name('admin.notices.update');
         Route::delete('admin/notices/{notice}', [NoticeController::class, 'destroy'])->name('admin.notices.destroy');
     });
-    Route::get('admin/dashboard', [DashboardController::class, 'admin'])
-        ->middleware('tenant.role:owner,admin')
-        ->name('admin.dashboard');
+
     Route::get('staff/dashboard', RoleDashboardController::class)
         ->defaults('role', 'staff')
-        ->middleware('tenant.role:staff,member')
+        ->middleware(RequireTenantRole::class.':staff,member')
         ->name('staff.dashboard');
     Route::get('student/dashboard', RoleDashboardController::class)
         ->defaults('role', 'student')
-        ->middleware('tenant.role:student')
+        ->middleware(RequireTenantRole::class.':student')
         ->name('student.dashboard');
     Route::get('parent/dashboard', RoleDashboardController::class)
         ->defaults('role', 'parent')
-        ->middleware('tenant.role:parent')
+        ->middleware(RequireTenantRole::class.':parent')
         ->name('parent.dashboard');
 
     Route::post('tenants', [TenantController::class, 'store'])->name('tenants.store');

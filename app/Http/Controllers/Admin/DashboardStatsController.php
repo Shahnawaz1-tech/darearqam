@@ -8,7 +8,6 @@ use App\Models\Fee;
 use App\Models\MadrasaClass;
 use App\Models\Notice;
 use App\Models\Student;
-use App\Models\Tenant;
 use App\Models\User;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\Request;
@@ -30,14 +29,14 @@ class DashboardStatsController extends Controller
         $members = $tenant->users()
             ->get(['users.id', 'users.name', 'users.email'])
             ->map(fn (User $u) => [
-                'id'    => $u->id,
-                'name'  => $u->name,
+                'id' => $u->id,
+                'name' => $u->name,
                 'email' => $u->email,
-                'role'  => $u->pivot->role,
+                'role' => $u->pivot->role,
             ])->values();
 
         // ── Students ─────────────────────────────────────────────────────
-        $totalStudents  = Student::count();
+        $totalStudents = Student::count();
         $activeStudents = Student::active()->count();
 
         // ── Classes ──────────────────────────────────────────────────────
@@ -45,10 +44,10 @@ class DashboardStatsController extends Controller
             ->withCount(['students' => fn ($q) => $q->where('status', 'active')])
             ->get(['id', 'name', 'type', 'session'])
             ->map(fn ($c) => [
-                'id'            => $c->id,
-                'name'          => $c->name,
-                'type'          => $c->type,
-                'session'       => $c->session,
+                'id' => $c->id,
+                'name' => $c->name,
+                'type' => $c->type,
+                'session' => $c->session,
                 'student_count' => $c->students_count,
             ])->values();
 
@@ -59,8 +58,8 @@ class DashboardStatsController extends Controller
             ->pluck('cnt', 'status');
 
         $presentToday = (int) ($todayAttendance['present'] ?? 0);
-        $absentToday  = (int) ($todayAttendance['absent']  ?? 0);
-        $lateToday    = (int) ($todayAttendance['late']    ?? 0);
+        $absentToday = (int) ($todayAttendance['absent'] ?? 0);
+        $lateToday = (int) ($todayAttendance['late'] ?? 0);
 
         // ── Fees this month ──────────────────────────────────────────────
         $feeSummary = Fee::where('month', $thisMonth)
@@ -76,45 +75,46 @@ class DashboardStatsController extends Controller
             ->limit(5)
             ->get(['id', 'title', 'type', 'published_at'])
             ->map(fn ($n) => [
-                'id'           => $n->id,
-                'title'        => $n->title,
-                'type'         => $n->type,
+                'id' => $n->id,
+                'title' => $n->title,
+                'type' => $n->type,
                 'published_at' => $n->published_at?->toDateString(),
             ])->values();
 
         // ── Attendance trend (last 7 days) ───────────────────────────────
         $trend = [];
         for ($i = 6; $i >= 0; $i--) {
-            $day   = $today->copy()->subDays($i);
-            $rows  = Attendance::whereDate('date', $day)
+            $day = $today->copy()->subDays($i);
+            $rows = Attendance::whereDate('date', $day)
                 ->selectRaw('status, count(*) as cnt')
                 ->groupBy('status')
                 ->pluck('cnt', 'status');
             $trend[] = [
-                'date'    => $day->format('D'),
+                'date' => $day->format('D'),
+                'label' => $day->format('d M'),
                 'present' => (int) ($rows['present'] ?? 0),
-                'absent'  => (int) ($rows['absent']  ?? 0),
+                'absent' => (int) ($rows['absent'] ?? 0),
             ];
         }
 
         return Inertia::render('admin/dashboard', [
-            'members'        => $members,
+            'members' => $members,
             'stats' => [
-                'totalStudents'  => $totalStudents,
+                'totalStudents' => $totalStudents,
                 'activeStudents' => $activeStudents,
-                'totalClasses'   => $classes->count(),
-                'staffCount'     => $members->filter(fn ($m) => in_array($m['role'], ['staff', 'member']))->count(),
-                'presentToday'   => $presentToday,
-                'absentToday'    => $absentToday,
-                'lateToday'      => $lateToday,
-                'feeTotal'       => (int) ($feeSummary->total      ?? 0),
-                'feeCollected'   => (int) ($feeSummary->collected  ?? 0),
-                'feePending'     => (int) ($feeSummary->pending    ?? 0),
-                'overdueCount'   => $overdueCount,
+                'totalClasses' => $classes->count(),
+                'staffCount' => $members->filter(fn ($m) => in_array($m['role'], ['staff', 'member']))->count(),
+                'presentToday' => $presentToday,
+                'absentToday' => $absentToday,
+                'lateToday' => $lateToday,
+                'feeTotal' => (int) ($feeSummary->total ?? 0),
+                'feeCollected' => (int) ($feeSummary->collected ?? 0),
+                'feePending' => (int) ($feeSummary->pending ?? 0),
+                'overdueCount' => $overdueCount,
             ],
-            'classes'        => $classes,
-            'notices'        => $notices,
-            'attendanceTrend'=> $trend,
+            'classes' => $classes,
+            'notices' => $notices,
+            'attendanceTrend' => $trend,
         ]);
     }
 }

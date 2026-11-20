@@ -10,11 +10,9 @@ import {
     Trash2,
     X,
 } from 'lucide-react';
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/input-error';
-import type { BreadcrumbItem } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,11 +62,6 @@ interface Props extends Record<string, unknown> {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const BREADCRUMBS: BreadcrumbItem[] = [
-    { title: 'Admin Dashboard', href: '/admin/dashboard' },
-    { title: 'Fees', href: '/admin/fees' },
-];
 
 const STATUS_OPTIONS = ['', 'paid', 'pending', 'partial', 'waived'] as const;
 
@@ -326,10 +319,9 @@ export default function Fees({ fees, summary, students, filters }: Props) {
     }
 
     return (
-        <AppLayout breadcrumbs={BREADCRUMBS}>
+        <>
             <Head title="Fees Management" />
-
-            <div className="min-h-screen bg-[#fbfaf6] p-4 md:p-6 lg:p-8">
+            <div className="min-h-[calc(100svh-72px)] bg-[#f5f7f6] p-3 sm:p-5 lg:p-7">
 
                 {/* ── Header ───────────────────────────────────────────────── */}
                 <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -563,6 +555,6 @@ export default function Fees({ fees, summary, students, filters }: Props) {
                     </div>
                 )}
             </div>
-        </AppLayout>
+        </>
     );
 }

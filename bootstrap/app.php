@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnsureMadrasaAdmin;
+use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RequireTenantRole;
@@ -18,9 +20,6 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
-        $middleware->alias([
-            'tenant.role' => RequireTenantRole::class,
-        ]);
 
         $middleware->web(append: [
             HandleAppearance::class,
@@ -29,9 +28,13 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // A single alias() call is required: Laravel's Middleware::alias()
+        // REPLACES the alias map (it does not merge). Splitting aliases across
+        // multiple calls silently drops the earlier ones.
         $middleware->alias([
-            'platform.admin' => \App\Http\Middleware\EnsurePlatformAdmin::class,
-            'madrasa.admin' => \App\Http\Middleware\EnsureMadrasaAdmin::class,
+            'tenant.role' => RequireTenantRole::class,
+            'platform.admin' => EnsurePlatformAdmin::class,
+            'madrasa.admin' => EnsureMadrasaAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

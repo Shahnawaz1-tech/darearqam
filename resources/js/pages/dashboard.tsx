@@ -131,7 +131,8 @@ export default function Dashboard({ members }: Props) {
     return (
         <>
             <Head title="Madrasa workspace" />
-            <main className="flex flex-1 flex-col gap-6 bg-[#fbfaf6] p-4 md:p-7 lg:p-8">
+            <main className="min-h-[calc(100svh-72px)] bg-[#f5f7f6] p-3 sm:p-5 lg:p-7">
+                <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
 
                 {/* ── Hero banner ─────────────────────────────────────────── */}
                 <section
@@ -567,6 +568,7 @@ export default function Dashboard({ members }: Props) {
                     <span>© {new Date().getFullYear()} Madrasa Dar-e-Arqam</span>
                     <span>Secure madrasa workspace</span>
                 </footer>
+                </div>
             </main>
         </>
     );

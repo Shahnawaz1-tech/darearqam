@@ -9,10 +9,8 @@ import {
     SaveAll,
     XCircle,
 } from 'lucide-react';
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { BreadcrumbItem } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,11 +45,6 @@ interface Props extends Record<string, unknown> {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const BREADCRUMBS: BreadcrumbItem[] = [
-    { title: 'Admin Dashboard', href: '/admin/dashboard' },
-    { title: 'Attendance', href: '/admin/attendance' },
-];
 
 const STATUS_OPTIONS: {
     value: AttendanceStatus;
@@ -162,10 +155,9 @@ export default function Attendance({
     const markedCount = Object.values(attendance).filter(Boolean).length;
 
     return (
-        <AppLayout breadcrumbs={BREADCRUMBS}>
+        <>
             <Head title="Attendance" />
-
-            <div className="min-h-screen bg-[#fbfaf6] p-4 md:p-6 lg:p-8">
+            <div className="min-h-[calc(100svh-72px)] bg-[#f5f7f6] p-3 sm:p-5 lg:p-7">
 
                 {/* ── Header ───────────────────────────────────────────────── */}
                 <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -348,6 +340,6 @@ export default function Attendance({
                     </div>
                 )}
             </div>
-        </AppLayout>
+        </>
     );
 }

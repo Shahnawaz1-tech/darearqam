@@ -40,15 +40,6 @@ class DashboardController extends Controller
         return to_route($route);
     }
 
-    public function admin(TenantContext $tenantContext): Response
-    {
-        $currentTenant = $tenantContext->current();
-
-        abort_unless($currentTenant !== null, 403);
-
-        return $this->workspace($currentTenant);
-    }
-
     private function workspace(?Tenant $tenant): Response
     {
         $members = $tenant

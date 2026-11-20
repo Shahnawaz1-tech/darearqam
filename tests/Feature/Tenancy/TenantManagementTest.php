@@ -111,7 +111,7 @@ test('the dashboard shows members of only the active tenant', function () {
         ->withSession(['current_tenant_id' => $activeTenant->id])
         ->get(route('admin.dashboard'))
         ->assertInertia(fn (Assert $page) => $page
-            ->component('dashboard')
+            ->component('admin/dashboard')
             ->has('members', 1)
             ->where('members.0.email', $owner->email));
 });
