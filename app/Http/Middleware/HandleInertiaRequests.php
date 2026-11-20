@@ -44,6 +44,7 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                'is_platform_admin' => (bool) $request->user()?->isPlatformAdmin(),
             ],
             'tenancy' => fn (): array => [
                 'tenants' => $tenantContext->tenants()

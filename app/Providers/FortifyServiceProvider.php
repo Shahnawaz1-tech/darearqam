@@ -4,8 +4,11 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
+use App\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -41,6 +44,31 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+
+        Fortify::authenticateUsing(function (Request $request): ?User {
+            $email = $request->input('email');
+            $password = $request->input('password');
+
+            if (! is_string($email) || ! is_string($password)) {
+                return null;
+            }
+
+            $user = User::query()
+                ->where('email', Str::lower($email))
+                ->first();
+
+            if ($user === null || ! Hash::check($password, $user->password)) {
+                return null;
+            }
+
+            $madrasa = app(TenantContext::class)->current();
+
+            if ($madrasa !== null && (int) $user->madrasa_id !== (int) $madrasa->getKey()) {
+                return null;
+            }
+
+            return $user;
+        });
     }
 
     /**
