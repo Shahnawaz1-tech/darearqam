@@ -369,9 +369,11 @@ export default function Welcome() {
                 >
                     <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
                         <a href="#home" aria-label="مدرسہ دارِ ارقم — صفحۂ اول" className="flex items-center gap-2.5">
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#1d5140] text-lg text-white shadow">
-                                📖
-                            </span>
+                            <img
+                                src="/madrasa-logo.png"
+                                alt="مدرسہ دارِ ارقم گرگری کا نشان"
+                                className="size-12 shrink-0 rounded-xl bg-[#f7f4e8] object-contain shadow-sm ring-1 ring-[#e5dfca]"
+                            />
                             <span className="flex flex-col leading-tight">
                                 <span className="text-base font-bold text-[#183b32]">مدرسہ دارِ ارقم</span>
                                 <span className="text-[9px] font-semibold uppercase tracking-widest text-[#789087]">Dar-e-Arqam Gurguri</span>
