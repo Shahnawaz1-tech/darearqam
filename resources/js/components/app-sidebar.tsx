@@ -55,12 +55,12 @@ export function AppSidebar() {
     ];
 
     return (
-        <Sidebar collapsible="icon" variant="inset" className="border-r border-slate-200/80 bg-[#fbfcfb]">
-            <SidebarHeader className="border-b border-slate-200/70 px-4 py-5">
+        <Sidebar collapsible="icon" variant="inset" className="border-r border-violet-800/20 bg-white">
+            <SidebarHeader className="border-b border-violet-100 bg-violet-700 px-4 py-4 text-white">
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch className="hover:bg-transparent">
+                            <Link href={dashboard()} prefetch className="hover:bg-violet-600">
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>

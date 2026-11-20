@@ -4,7 +4,6 @@ import {
     ArrowUpRight,
     Bell,
     BookOpen,
-    CalendarDays,
     CheckCircle2,
     ChevronRight,
     CircleDollarSign,
@@ -105,25 +104,27 @@ function StatCard({
     detail,
     icon: Icon,
     iconClass,
+    cardClass,
 }: {
     label: string;
     value: string | number;
     detail: string;
     icon: React.ElementType;
     iconClass: string;
+    cardClass: string;
 }) {
     return (
-        <article className="group rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/40 sm:p-5">
+        <article className={`group rounded-xl p-4 text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${cardClass}`}>
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
-                    <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px]">{value}</p>
+                    <p className="text-xs font-medium text-white/90 sm:text-sm">{label}</p>
+                    <p className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[28px]">{value}</p>
                 </div>
                 <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${iconClass}`}>
                     <Icon className="size-5" aria-hidden="true" />
                 </span>
             </div>
-            <p className="mt-2 text-[11px] text-slate-400 sm:text-xs">{detail}</p>
+            <p className="mt-2 text-[11px] text-white/80 sm:text-xs">{detail}</p>
         </article>
     );
 }
@@ -202,21 +203,22 @@ export default function AdminDashboard({ stats, classes, notices, attendanceTren
     return (
         <>
             <Head title="Overview" />
-            <main className="min-h-[calc(100svh-72px)] bg-[#f5f7f6] p-3 sm:p-5 lg:p-7">
+            <main className="min-h-[calc(100svh-64px)] bg-[#f4f5fa] p-3 sm:p-5 lg:p-6">
                 <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
-                    <section className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white px-5 py-5 shadow-[0_1px_3px_rgba(15,23,42,0.03)] sm:flex-row sm:items-center sm:px-6">
+                    <section className="flex flex-col justify-between gap-4 rounded-xl bg-violet-700 px-5 py-5 text-white shadow-sm sm:flex-row sm:items-center sm:px-6 sm:py-6">
                         <div>
-                            <p className="text-[11px] font-semibold tracking-[0.16em] text-emerald-700 uppercase">Administration</p>
-                            <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Good morning, Administrator</h2>
-                            <p className="mt-1 text-xs text-slate-500 sm:text-sm">Here is what is happening across your madrasa today.</p>
+                            <p className="text-[11px] font-semibold tracking-[0.16em] text-violet-200 uppercase">Madrasa Dar-e-Arqam Gurguri</p>
+                            <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Welcome back, Administrator <span aria-hidden="true">👋</span></h2>
+                            <p className="mt-1 text-xs text-violet-100 sm:text-sm">Your madrasa at a glance · {todayLabel()}</p>
+                            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-white/90">
+                                <span><strong className="text-base text-white">{stats.totalStudents.toLocaleString()}</strong> students</span>
+                                <span><strong className="text-base text-white">{stats.totalClasses.toLocaleString()}</strong> classes</span>
+                                <span><strong className="text-base text-white">{stats.presentToday.toLocaleString()}</strong> present today</span>
+                            </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
-                                <CalendarDays className="size-4 text-slate-400" aria-hidden="true" />
-                                {todayLabel()}
-                            </div>
                             <div
-                                className="flex h-10 items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700"
+                                className="flex h-9 items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 text-xs font-semibold text-white"
                                 title={`Last updated ${lastUpdated.toLocaleTimeString('en-PK')}`}
                             >
                                 <span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.10)]" />
@@ -226,17 +228,17 @@ export default function AdminDashboard({ stats, classes, notices, attendanceTren
                     </section>
 
                     <section aria-label="Key statistics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <StatCard label="Total Students" value={stats.totalStudents.toLocaleString()} detail="All enrolled students" icon={GraduationCap} iconClass="bg-emerald-50 text-emerald-700" />
-                        <StatCard label="Active Students" value={stats.activeStudents.toLocaleString()} detail={`${stats.totalStudents > 0 ? Math.round(stats.activeStudents / stats.totalStudents * 100) : 0}% of total enrolment`} icon={Users} iconClass="bg-blue-50 text-blue-700" />
-                        <StatCard label="Classes" value={stats.totalClasses.toLocaleString()} detail="Active class sections" icon={BookOpen} iconClass="bg-violet-50 text-violet-700" />
-                        <StatCard label="Staff Members" value={stats.staffCount.toLocaleString()} detail="Teaching and admin staff" icon={Users} iconClass="bg-amber-50 text-amber-700" />
+                        <StatCard label="Total Students" value={stats.totalStudents.toLocaleString()} detail="All enrolled students" icon={GraduationCap} iconClass="bg-white/20 text-white" cardClass="bg-[#bf4cbb]" />
+                        <StatCard label="Active Students" value={stats.activeStudents.toLocaleString()} detail={`${stats.totalStudents > 0 ? Math.round(stats.activeStudents / stats.totalStudents * 100) : 0}% of total enrolment`} icon={Users} iconClass="bg-white/20 text-white" cardClass="bg-[#9655d4]" />
+                        <StatCard label="Classes" value={stats.totalClasses.toLocaleString()} detail="Active class sections" icon={BookOpen} iconClass="bg-white/20 text-white" cardClass="bg-[#5e85ed]" />
+                        <StatCard label="Staff Members" value={stats.staffCount.toLocaleString()} detail="Teaching and admin staff" icon={Users} iconClass="bg-white/20 text-white" cardClass="bg-[#18a7bb]" />
                     </section>
 
                     <section aria-label="Today's operations" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <StatCard label="Present Today" value={stats.presentToday.toLocaleString()} detail={`${stats.lateToday} marked late`} icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
-                        <StatCard label="Absent Today" value={stats.absentToday.toLocaleString()} detail="Marked absent today" icon={XCircle} iconClass="bg-rose-50 text-rose-600" />
-                        <StatCard label="Fee Collected" value={pkr(stats.feeCollected)} detail={`of ${pkr(stats.feeTotal)} total`} icon={CircleDollarSign} iconClass="bg-sky-50 text-sky-700" />
-                        <StatCard label="Fee Pending" value={pkr(stats.feePending)} detail={`${stats.overdueCount} overdue accounts`} icon={WalletCards} iconClass="bg-orange-50 text-orange-700" />
+                        <StatCard label="Present Today" value={stats.presentToday.toLocaleString()} detail={`${stats.lateToday} marked late`} icon={CheckCircle2} iconClass="bg-white/20 text-white" cardClass="bg-[#23a887]" />
+                        <StatCard label="Absent Today" value={stats.absentToday.toLocaleString()} detail="Marked absent today" icon={XCircle} iconClass="bg-white/20 text-white" cardClass="bg-[#db647d]" />
+                        <StatCard label="Fee Collected" value={pkr(stats.feeCollected)} detail={`of ${pkr(stats.feeTotal)} total`} icon={CircleDollarSign} iconClass="bg-white/20 text-white" cardClass="bg-[#388fce]" />
+                        <StatCard label="Fee Pending" value={pkr(stats.feePending)} detail={`${stats.overdueCount} overdue accounts`} icon={WalletCards} iconClass="bg-white/20 text-white" cardClass="bg-[#e39b38]" />
                     </section>
 
                     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.75fr)]">

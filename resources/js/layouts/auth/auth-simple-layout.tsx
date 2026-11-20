@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Star } from 'lucide-react';
+import AppLogoIcon from '@/components/app-logo-icon';
 import { home } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
 
@@ -32,8 +32,8 @@ export default function AuthSimpleLayout({
                         aria-label="Dar-e-Arqam Schools home"
                         className="relative z-10 flex flex-col items-center gap-1"
                     >
-                        <span className="mb-1 flex size-12 items-center justify-center rounded-xl border-2 border-[#d6b648] bg-[#0e5c43] text-[#e2bd4e]">
-                            <Star className="size-5 fill-current" />
+                        <span className="mb-1 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-[#f7f4e8] p-1 shadow-md ring-1 ring-white/40">
+                            <AppLogoIcon className="size-full object-contain" />
                         </span>
                         <span className="text-xl font-bold tracking-[0.12em]">
                             DAR-E-ARQAM
