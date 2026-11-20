@@ -167,7 +167,7 @@ function AddClassForm({ onClose }: { onClose: () => void }) {
     function submit(e: React.FormEvent) {
         e.preventDefault();
         setSubmitting(true);
-        router.post('/admin/classes', data as unknown as Record<string, unknown>, {
+        router.post('/admin/classes', data as unknown as Record<string, string | boolean>, {
             onSuccess: () => {
                 setSubmitting(false);
                 onClose();
@@ -280,7 +280,7 @@ function EditClassForm({
     function submit(e: React.FormEvent) {
         e.preventDefault();
         setSubmitting(true);
-        router.patch(`/admin/classes/${cls.id}`, data as unknown as Record<string, unknown>, {
+        router.patch(`/admin/classes/${cls.id}`, data as unknown as Record<string, string | boolean>, {
             onSuccess: () => {
                 setSubmitting(false);
                 onClose();

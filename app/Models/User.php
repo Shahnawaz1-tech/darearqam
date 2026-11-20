@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use App\Tenancy\TenantContext;
 
 /**
  * @property int $id
@@ -54,6 +55,34 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withPivot('role')
             ->withTimestamps()
             ->orderBy('tenants.name');
+    }
+
+    /**
+     * A platform admin is a user who owns at least one tenant (madrasa).
+     * This gates platform-wide administration routes.
+     */
+    public function isPlatformAdmin(): bool
+    {
+        return $this->tenants()
+            ->wherePivot('role', Tenant::ROLE_OWNER)
+            ->exists();
+    }
+
+    /**
+     * A madrasa admin is a user who is an owner or admin of the current tenant.
+     */
+    public function isMadrasaAdmin(): bool
+    {
+        $current = app(TenantContext::class)->current();
+
+        if ($current === null) {
+            return false;
+        }
+
+        return $this->tenants()
+            ->whereKey($current->getKey())
+            ->wherePivotIn('role', [Tenant::ROLE_OWNER, Tenant::ROLE_ADMIN])
+            ->exists();
     }
 
     /**

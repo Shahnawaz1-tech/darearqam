@@ -23,8 +23,6 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(append: [
-            ResolveTenantFromSubdomain::class,
-            EnsureTenantMembership::class,
             HandleAppearance::class,
             SetTenantContext::class,
             HandleInertiaRequests::class,
