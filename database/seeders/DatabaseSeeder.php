@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             DemoAccountsSeeder::class,
             MadrasaDemoSeeder::class,
             PublicWelcomeContentSeeder::class,
+            StudentDashboardSeeder::class,
         ]);
     }
 }

@@ -62,6 +62,27 @@
 }
 
 :root {
+    --brand: #6b3fe0;
+    --brand-soft: #efe9fd;
+    --ok: #1fae6b;
+    --warn: #f5b82e;
+    --danger: #e5484d;
+    --info: #20b6c9;
+    --page: #f4f5fa;
+    --student-card: #ffffff;
+    --student-border: #e8e8f0;
+    --student-radius: 12px;
+    --student-shadow: 0 2px 8px rgb(25 29 55 / 4%);
+    --brand: #6b3fe0;
+    --brand-soft: #efe9fd;
+    --ok: #1fae6b;
+    --warn: #f5b82e;
+    --danger: #e5484d;
+    --info: #20b6c9;
+    --page: #f4f5fa;
+    --card-border: #e8e8f0;
+    --card-radius: 12px;
+    --subtle-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);

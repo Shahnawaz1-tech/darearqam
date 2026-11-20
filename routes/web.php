@@ -10,6 +10,9 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ResultController;
 use App\Http\Controllers\RoleDashboardController;
+use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
+use App\Http\Controllers\Student\StudentActionController;
+use App\Http\Controllers\Student\StudentDocumentController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\WelcomeController;
 use App\Http\Middleware\RequireTenantRole;
@@ -65,10 +68,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->defaults('role', 'staff')
         ->middleware(RequireTenantRole::class.':staff,member')
         ->name('staff.dashboard');
-    Route::get('student/dashboard', RoleDashboardController::class)
-        ->defaults('role', 'student')
+    Route::get('student/dashboard', StudentDashboardController::class)
         ->middleware(RequireTenantRole::class.':student')
         ->name('student.dashboard');
+    Route::post('student/homework/{homework}/submit', [StudentActionController::class, 'submitHomework'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.homework.submit');
+    Route::post('student/leave-requests', [StudentActionController::class, 'createLeave'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.leave.store');
+    Route::post('student/threads/{thread}/reply', [StudentActionController::class, 'reply'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.thread.reply');
+    Route::get('student/id-card', [StudentDocumentController::class, 'idCard'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.id-card');
+    Route::get('student/result/{exam}/print', [StudentDocumentController::class, 'result'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.result.print');
     Route::get('parent/dashboard', RoleDashboardController::class)
         ->defaults('role', 'parent')
         ->middleware(RequireTenantRole::class.':parent')

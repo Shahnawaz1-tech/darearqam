@@ -3,13 +3,25 @@
 namespace Database\Seeders;
 
 use App\Models\Attendance;
+use App\Models\Course;
+use App\Models\CourseProgress;
 use App\Models\Exam;
 use App\Models\Fee;
+use App\Models\HifzLog;
+use App\Models\Homework;
+use App\Models\HomeworkSubmission;
+use App\Models\LeaveRequest;
+use App\Models\PointEvent;
 use App\Models\MadrasaClass;
 use App\Models\Notice;
+use App\Models\Resource;
 use App\Models\Result;
 use App\Models\Student;
+use App\Models\StudentRemark;
 use App\Models\Subject;
+use App\Models\Thread;
+use App\Models\ThreadMessage;
+use App\Models\TimetableSlot;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
@@ -71,7 +83,7 @@ class MadrasaDemoSeeder extends Seeder
             Tenant::ROLE_STAFF,
             $tenant,
         );
-        $this->upsertUser('student@darearqam.test', 'طالب علم احمد', Tenant::ROLE_STUDENT, $tenant);
+        $studentUser = $this->upsertUser('student@darearqam.test', 'طالب علم احمد', Tenant::ROLE_STUDENT, $tenant);
         $this->upsertUser('parent@darearqam.test', 'والدین ولی', Tenant::ROLE_PARENT, $tenant, true);
 
         // Extra staff
@@ -174,6 +186,11 @@ class MadrasaDemoSeeder extends Seeder
         }
 
         $this->command?->info('  ✓ ' . count($students) . ' students created.');
+
+        $demoStudent = collect($students)->first(fn (Student $student) => $student->status === 'active');
+        if ($demoStudent) {
+            $demoStudent->update(['user_id' => $studentUser->id]);
+        }
 
         // ── 7. Exams ─────────────────────────────────────────────────────
         $examsByClass = [];
@@ -292,6 +309,105 @@ class MadrasaDemoSeeder extends Seeder
         }
 
         $this->command?->info('  ✓ Fee records created.');
+
+        if ($demoStudent) {
+            $courseNames = [
+                ['Nazra Recitation', ['Nazra','Tajweed']],
+                ['Hifz Track', ['Hifz','Revision']],
+                ['Dars-e-Nizami Arabic', ['Arabic','Grammar']],
+                ['Modern Studies', ['English','Science','Math']],
+            ];
+            $courses = [];
+            foreach ($courseNames as $index => [$title, $tags]) {
+                $course = Course::firstOrCreate(
+                    ['tenant_id' => $tenant->id, 'class_id' => $demoStudent->class_id, 'title' => $title],
+                    ['teacher_id' => $staffUser->id, 'tags' => $tags],
+                );
+                $courses[] = $course;
+                CourseProgress::updateOrCreate(
+                    ['tenant_id' => $tenant->id, 'student_id' => $demoStudent->id, 'course_id' => $course->id],
+                    ['percent' => [72, 58, 64, 81][$index]],
+                );
+            }
+
+            foreach ($courses as $index => $course) {
+                TimetableSlot::firstOrCreate(
+                    ['tenant_id' => $tenant->id, 'class_id' => $demoStudent->class_id, 'weekday' => Carbon::today()->dayOfWeekIso, 'starts_at' => sprintf('%02d:00:00', 8 + $index)],
+                    ['course_id' => $course->id, 'teacher_id' => $staffUser->id, 'ends_at' => sprintf('%02d:40:00', 8 + $index), 'room' => 'Room '.($index + 1), 'topic' => 'Weekly lesson', 'live_url' => $index === 0 ? 'https://example.test/lesson' : null],
+                );
+            }
+
+            $homeworkTitles = [
+                ['Nazra revision', 'pending'], ['Surah practice', 'submitted'], ['Arabic exercise', 'graded'],
+                ['Weekly hifz sabqi', 'late'], ['Science worksheet', 'pending'], ['Tajweed rules', 'submitted'],
+            ];
+            foreach ($homeworkTitles as $index => [$title, $status]) {
+                $homework = Homework::firstOrCreate(
+                    ['tenant_id' => $tenant->id, 'class_id' => $demoStudent->class_id, 'title' => $title],
+                    ['course_id' => $courses[$index % 4]->id, 'description' => 'Complete this assignment and submit your work.', 'due_at' => Carbon::now()->addDays($index - 2)],
+                );
+                HomeworkSubmission::updateOrCreate(
+                    ['tenant_id' => $tenant->id, 'homework_id' => $homework->id, 'student_id' => $demoStudent->id],
+                    ['status' => $status, 'submitted_at' => $status === 'pending' ? null : Carbon::now()->subDays(1), 'text' => $status === 'pending' ? null : 'Submitted for teacher review.'],
+                );
+            }
+
+            foreach (range(0, 6) as $index) {
+                Attendance::updateOrCreate(
+                    ['tenant_id' => $tenant->id, 'student_id' => $demoStudent->id, 'class_id' => $demoStudent->class_id, 'date' => $weekStart = Carbon::today()->subDays(6 - $index)->toDateString()],
+                    ['status' => $index === 5 ? 'absent' : 'present', 'marked_by' => $staffUser->id],
+                );
+            }
+
+            foreach ([
+                ['sabaq','Surah 2','Ayah 142','excellent','Clear recitation'],
+                ['sabqi','Surah 1','Ayah 1','good','Improve pace'],
+                ['manzil','Surah 36','Ayah 83','excellent','Strong recall'],
+                ['sabaq','Surah 3','Ayah 200','good','Revise makharij'],
+                ['sabqi','Surah 67','Ayah 30','needs_work','Repeat pronunciation'],
+            ] as $index => [$type,$from,$to,$rating,$remarks]) {
+                HifzLog::create([
+                    'student_id' => $demoStudent->id,
+                    'teacher_id' => $staffUser->id,
+                    'date' => Carbon::today()->subDays($index),
+                    'type' => $type,
+                    'from_ref' => $from,
+                    'to_ref' => $to,
+                    'rating' => $rating,
+                    'remarks' => $remarks,
+                ]);
+            }
+
+            PointEvent::create(['student_id' => $demoStudent->id, 'points' => 120, 'reason' => 'Homework on time', 'date' => Carbon::today()]);
+            PointEvent::create(['student_id' => $demoStudent->id, 'points' => 80, 'reason' => 'Attendance streak', 'date' => Carbon::today()->subDays(2)]);
+            PointEvent::create(['student_id' => $demoStudent->id, 'points' => 95, 'reason' => 'Hifz target', 'date' => Carbon::today()->subDays(4)]);
+
+            foreach ([
+                ['behaviour','Shows respect and helps classmates.'],
+                ['cleanliness','Maintains a tidy desk and classroom area.'],
+                ['punctuality','Arrives prepared for daily assembly.'],
+            ] as [$category,$body]) {
+                StudentRemark::create(['student_id' => $demoStudent->id, 'teacher_id' => $staffUser->id, 'category' => $category, 'body' => $body, 'date' => Carbon::today()]);
+            }
+
+            LeaveRequest::create(['student_id' => $demoStudent->id, 'from_date' => Carbon::today()->addDays(3), 'to_date' => Carbon::today()->addDays(4), 'reason' => 'Family event', 'status' => 'pending']);
+
+            foreach ([
+                ['notes','Daily Nazra Notes'], ['books','Library Reading'], ['files','Shared Worksheets'],
+                ['past_papers','Past Exam Papers'], ['audio','Tajweed Audio'], ['forms','Leave Application'],
+            ] as $index => [$category,$title]) {
+                Resource::create(['class_id' => $demoStudent->class_id, 'category' => $category, 'title' => $title, 'file_path' => 'demo/resource-'.$index.'.pdf', 'uploaded_by' => $staffUser->id]);
+            }
+
+            foreach ([
+                ['Question','Tajweed revision'],
+                ['Answer','Homework guidance'],
+                ['Notice','Friday assembly'],
+            ] as $index => [$tag,$title]) {
+                $thread = Thread::create(['class_id' => $demoStudent->class_id, 'author_id' => $staffUser->id, 'tag' => strtolower($tag), 'title' => $title]);
+                ThreadMessage::create(['thread_id' => $thread->id, 'author_id' => $staffUser->id, 'body' => 'Please prepare and bring your revision notes.']);
+            }
+        }
 
         // ── 11. Notices ──────────────────────────────────────────────────
         $noticeData = [

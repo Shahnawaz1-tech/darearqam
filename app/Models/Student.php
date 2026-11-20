@@ -66,6 +66,11 @@ class Student extends Model
         return $this->hasMany(Result::class);
     }
 
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
