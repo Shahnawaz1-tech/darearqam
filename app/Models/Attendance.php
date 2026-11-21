@@ -10,7 +10,7 @@ class Attendance extends Model
 {
     use BelongsToTenant;
 
-    protected $fillable = ['student_id', 'class_id', 'date', 'status', 'note', 'marked_by'];
+    protected $fillable = ['tenant_id', 'student_id', 'class_id', 'date', 'status', 'note', 'marked_by', 'marked_at'];
 
     protected $casts = ['date' => 'date'];
 

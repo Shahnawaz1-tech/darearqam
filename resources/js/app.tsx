@@ -6,6 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import StudentLayout from '@/layouts/student-layout';
+import TeacherLayout from '@/layouts/teacher-layout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -21,6 +22,8 @@ void createInertiaApp({
                 return [AppLayout, SettingsLayout];
             case name.startsWith('student/'):
                 return StudentLayout;
+            case name.startsWith('teacher/'):
+                return TeacherLayout;
             default:
                 return AppLayout;
         }

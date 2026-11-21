@@ -6,6 +6,7 @@ import {
     CalendarCheck,
     GraduationCap,
     LayoutDashboard,
+    UserRound,
     UsersRound,
     Wallet,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ export function AppSidebar() {
                   { title: 'Overview', href: '/admin/dashboard', icon: LayoutDashboard },
                   { title: 'Students', href: '/admin/students', icon: GraduationCap },
                   { title: 'Classes', href: '/admin/classes', icon: BookOpen },
+                  { title: 'Teachers', href: '/admin/staff', icon: UserRound },
                   { title: 'Attendance', href: '/admin/attendance', icon: CalendarCheck },
                   { title: 'Fees', href: '/admin/fees', icon: Wallet },
                   { title: 'Notices', href: '/admin/notices', icon: Bell },

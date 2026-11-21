@@ -29,6 +29,7 @@ use App\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class MadrasaDemoSeeder extends Seeder
@@ -119,6 +120,14 @@ class MadrasaDemoSeeder extends Seeder
             $classes[] = MadrasaClass::firstOrCreate(
                 ['tenant_id' => $tenant->id, 'name' => $cd['name']],
                 ['type' => $cd['type'], 'session' => $cd['session'], 'is_active' => true],
+            );
+        }
+
+        // Link the demo teacher to two classes through the admin-managed pivot.
+        foreach ([$classes[0]->id, $classes[2]->id] as $classId) {
+            DB::table('teacher_class')->updateOrInsert(
+                ['tenant_id' => $tenant->id, 'user_id' => $staffUser->id, 'class_id' => $classId, 'course_id' => null],
+                ['created_at' => now(), 'updated_at' => now()],
             );
         }
 
@@ -397,6 +406,17 @@ class MadrasaDemoSeeder extends Seeder
                 ['past_papers','Past Exam Papers'], ['audio','Tajweed Audio'], ['forms','Leave Application'],
             ] as $index => [$category,$title]) {
                 Resource::create(['class_id' => $demoStudent->class_id, 'category' => $category, 'title' => $title, 'file_path' => 'demo/resource-'.$index.'.pdf', 'uploaded_by' => $staffUser->id]);
+            }
+
+            foreach ([
+                ['محمد اکرم', 'message', 'Hifz revision', 'My son is finding it difficult to revise Surah 67. Please advise.'],
+                ['علی احمد', 'whatsapp', 'Homework help', 'Please share the worksheet discussed in today’s class.'],
+                ['فاروق احمد', 'email', 'Attendance question', 'Could you confirm whether my child was marked present today?'],
+            ] as $index => [$guardian, $channel, $subject, $body]) {
+                DB::table('parent_messages')->updateOrInsert(
+                    ['tenant_id' => $tenant->id, 'class_id' => $demoStudent->class_id, 'student_id' => $demoStudent->id, 'guardian_name' => $guardian, 'subject' => $subject],
+                    ['channel' => $channel, 'body' => $body, 'direction' => 'in', 'read_at' => null, 'replied_to_id' => null, 'created_at' => Carbon::now()->subMinutes(30 * ($index + 1)), 'updated_at' => now()],
+                );
             }
 
             foreach ([

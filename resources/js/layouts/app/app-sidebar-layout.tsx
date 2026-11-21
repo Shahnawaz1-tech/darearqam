@@ -32,6 +32,8 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
           ? 'Students'
           : page.url.startsWith('/admin/classes')
             ? 'Classes'
+            : page.url.startsWith('/admin/staff')
+              ? 'Teachers'
             : page.url.startsWith('/admin/attendance')
               ? 'Attendance'
               : page.url.startsWith('/admin/fees')

@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ClassController;
+use App\Http\Controllers\Admin\ClearApplicationCachesController;
 use App\Http\Controllers\Admin\DashboardStatsController;
 use App\Http\Controllers\Admin\FeeController;
 use App\Http\Controllers\Admin\NoticeController;
 use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ResultController;
@@ -16,6 +18,8 @@ use App\Http\Controllers\Student\StudentActionController;
 use App\Http\Controllers\Student\StudentDocumentController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\WelcomeController;
+use App\Http\Controllers\Teacher\DashboardController as TeacherDashboardController;
+use App\Http\Controllers\Teacher\ActionController as TeacherActionController;
 use App\Http\Middleware\RequireTenantRole;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +35,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ── Admin-only module routes ──────────────────────────────────────────
     Route::middleware(RequireTenantRole::class.':owner,admin')->group(function () {
+        Route::get('clear', ClearApplicationCachesController::class)
+            ->middleware('throttle:5,1')
+            ->name('maintenance.clear');
         Route::redirect('admin/student', '/admin/students')->name('admin.student.redirect');
         // Admin stats dashboard
         Route::get('admin/dashboard', DashboardStatsController::class)
@@ -41,6 +48,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('admin/students', [StudentController::class, 'store'])->name('admin.students.store');
         Route::patch('admin/students/{student}', [StudentController::class, 'update'])->name('admin.students.update');
         Route::delete('admin/students/{student}', [StudentController::class, 'destroy'])->name('admin.students.destroy');
+
+        // Staff / teacher assignments
+        Route::get('admin/staff', [StaffController::class, 'index'])->name('admin.staff.index');
+        Route::post('admin/staff', [StaffController::class, 'store'])->name('admin.staff.store');
+        Route::patch('admin/staff/{staff}', [StaffController::class, 'update'])->name('admin.staff.update');
+        Route::delete('admin/staff/{staff}', [StaffController::class, 'destroy'])->name('admin.staff.destroy');
 
         // Classes
         Route::get('admin/classes', [ClassController::class, 'index'])->name('admin.classes.index');
@@ -65,10 +78,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('admin/notices/{notice}', [NoticeController::class, 'destroy'])->name('admin.notices.destroy');
     });
 
-    Route::get('staff/dashboard', RoleDashboardController::class)
-        ->defaults('role', 'staff')
+    Route::get('staff/dashboard', TeacherDashboardController::class)
         ->middleware(RequireTenantRole::class.':staff,member')
         ->name('staff.dashboard');
+    Route::middleware(RequireTenantRole::class.':staff,member')->group(function (): void {
+        Route::post('teacher/attendance', [TeacherActionController::class, 'attendance'])->name('teacher.attendance.store');
+        Route::patch('teacher/submissions/{submission}/grade', [TeacherActionController::class, 'grade'])->name('teacher.submissions.grade');
+        Route::post('teacher/marks', [TeacherActionController::class, 'marks'])->name('teacher.marks.store');
+        Route::post('teacher/hifz', [TeacherActionController::class, 'hifz'])->name('teacher.hifz.store');
+        Route::post('teacher/remarks', [TeacherActionController::class, 'remark'])->name('teacher.remarks.store');
+        Route::patch('teacher/leave-requests/{leave}', [TeacherActionController::class, 'leave'])->name('teacher.leave.update');
+        Route::post('teacher/messages/{message}/reply', [TeacherActionController::class, 'reply'])->name('teacher.messages.reply');
+        Route::post('teacher/class-diary', [TeacherActionController::class, 'classDiary'])->name('teacher.class-diary.store');
+        Route::get('teacher/export/attendance', [TeacherActionController::class, 'exportAttendance'])->name('teacher.export.attendance');
+        Route::get('teacher/export/marks', [TeacherActionController::class, 'exportMarks'])->name('teacher.export.marks');
+    });
     Route::get('student/dashboard', StudentDashboardController::class)
         ->middleware(RequireTenantRole::class.':student')
         ->name('student.dashboard');
