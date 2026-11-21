@@ -47,9 +47,8 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
 
     const sidebar = (
         <aside className="flex h-full w-[248px] shrink-0 flex-col border-e border-[var(--student-border)] bg-white" aria-label={t.dashboardNav}>
-            <div className="flex items-center gap-3 border-b border-[var(--student-border)] px-5 py-5">
+            <div className="flex justify-center border-b border-[var(--student-border)] px-5 py-4">
                 <AppLogoIcon className="size-10 rounded-lg bg-[#f8f5e9] object-contain" />
-                <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-800">{t.brand}</p><p className="text-[10px] text-slate-500" dir="ltr">{t.brandLatin}</p></div>
             </div>
             <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
                 {navGroups.map((group) => <div key={group.label}>
@@ -88,13 +87,15 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
     const context = useMemo(() => ({ lang, t, search, setSearch }), [lang, t, search]);
     return <TeacherShellContext.Provider value={context}>
         <div className="min-h-screen bg-[var(--page)] text-slate-800" lang={lang} dir={lang === 'ur' ? 'rtl' : 'ltr'} style={{ '--brand': '#6b3fe0', '--brand-soft': '#efe9fd', fontFamily: lang === 'ur' ? "'Noto Nastaliq Urdu', serif" : "'Inter', system-ui, sans-serif", lineHeight: lang === 'ur' ? 2.1 : 1.55 } as React.CSSProperties}>
-            <header className="sticky top-0 z-40 flex h-16 items-center gap-3 bg-[var(--brand)] px-3 text-white shadow-sm sm:px-5">
+            <header dir="ltr" className="sticky top-0 z-40 flex h-16 items-center gap-3 bg-[var(--brand)] px-3 text-white shadow-sm sm:px-5">
                 <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="flex size-9 items-center justify-center rounded-lg bg-white/15 lg:hidden">{mobileOpen ? <X /> : <Menu />}</button>
-                <Link href="/staff/dashboard" className="flex items-center gap-2"><AppLogoIcon className="size-9 rounded-lg bg-[#f8f5e9]" /><span className="hidden text-sm font-bold sm:inline">{t.brand}</span></Link>
-                <label className="ms-auto flex h-9 min-w-0 max-w-[360px] flex-1 items-center gap-2 rounded-full bg-white px-3 text-slate-500 sm:ms-6"><Search className="size-4" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.search} className="min-w-0 flex-1 bg-transparent text-xs outline-none" /></label>
-                <button type="button" onClick={changeLanguage} className="rounded-full border border-white/30 px-3 py-1 text-xs font-semibold">{t.language}</button>
-                <button type="button" aria-label={t.notifications} className="relative hidden size-9 items-center justify-center rounded-full bg-white/15 sm:flex"><Bell className="size-4" /></button>
-                <button type="button" aria-label={t.profileSettings} className="flex size-9 items-center justify-center rounded-full border-2 border-white/70 bg-white/20 text-sm font-bold">{page.props.auth.user?.name?.charAt(0) ?? 'ا'}</button>
+                <Link href="/staff/dashboard" className="flex shrink-0 items-center gap-2"><AppLogoIcon className="size-9 rounded-lg bg-[#f8f5e9]" /><span className="hidden text-sm font-bold sm:inline">{t.brand}</span></Link>
+                <div className="ms-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+                    <label className="flex h-9 min-w-0 max-w-[360px] flex-1 items-center gap-2 rounded-full bg-white px-3 text-slate-500"><Search className="size-4 shrink-0" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.search} className="min-w-0 flex-1 bg-transparent text-xs outline-none" /></label>
+                    <button type="button" onClick={changeLanguage} className="shrink-0 rounded-full border border-white/30 px-3 py-1 text-xs font-semibold">{t.language}</button>
+                    <button type="button" aria-label={t.notifications} className="relative hidden size-9 shrink-0 items-center justify-center rounded-full bg-white/15 sm:flex"><Bell className="size-4" /></button>
+                    <button type="button" aria-label={t.profileSettings} className="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-white/70 bg-white/20 text-sm font-bold">{page.props.auth.user?.name?.charAt(0) ?? 'ا'}</button>
+                </div>
             </header>
             <div className="flex min-h-[calc(100vh-4rem)]">
                 <div className="sticky top-16 hidden h-[calc(100vh-4rem)] shrink-0 lg:block">{sidebar}</div>
