@@ -5,6 +5,8 @@ import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { Bell, Search } from 'lucide-react';
 import { usePage } from '@inertiajs/react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { UserMenuContent } from '@/components/user-menu-content';
 import type { AppLayoutProps } from '@/types';
 
 export default function AppSidebarLayout({
@@ -60,19 +62,35 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <label className="hidden h-9 w-64 items-center gap-2 rounded-full border border-white/20 bg-white px-3 text-slate-400 lg:flex">
+                        <label className="hidden h-9 w-40 items-center gap-2 rounded-full border border-white/20 bg-white px-3 text-slate-400 md:flex lg:w-64">
                             <Search className="size-4" aria-hidden="true" />
-                            <span className="text-sm">Search workspace</span>
-                            <kbd className="ml-auto rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">Ctrl K</kbd>
+                            <span className="truncate text-sm">Search workspace</span>
+                            <kbd className="ml-auto hidden shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 lg:inline">Ctrl K</kbd>
                         </label>
                         <button
                             type="button"
-                            className="relative flex size-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-sm transition hover:bg-white/20"
+                            className="relative flex size-9 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-sm transition hover:bg-white/20"
                             aria-label="Notifications"
                         >
                             <Bell className="size-4" aria-hidden="true" />
                             <span className="absolute top-2 right-2 size-1.5 rounded-full bg-emerald-500 ring-2 ring-white" />
                         </button>
+                        {page.props.auth.user && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label="Profile"
+                                        className="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-white/70 bg-white/20 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                    >
+                                        {page.props.auth.user.name.charAt(0)}
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="min-w-52">
+                                    <UserMenuContent user={page.props.auth.user} />
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
                 </header>
                 {children}

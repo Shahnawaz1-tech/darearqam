@@ -6,25 +6,24 @@ import {
     CalendarCheck,
     GraduationCap,
     LayoutDashboard,
+    LogOut,
     UserRound,
     UsersRound,
     Wallet,
 } from 'lucide-react';
-import AppLogo from '@/components/app-logo';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { NavUser } from '@/components/nav-user';
+import { logout } from '@/routes';
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarGroup,
     SidebarGroupLabel,
-    SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
@@ -58,18 +57,6 @@ export function AppSidebar() {
 
     return (
         <Sidebar collapsible="icon" variant="inset" className="border-r border-violet-800/20 bg-white">
-            <SidebarHeader className="border-b border-violet-100 bg-violet-700 px-4 py-4 text-white">
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch className="hover:bg-violet-600">
-                                <AppLogo />
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarHeader>
-
             <SidebarContent className="px-1 pt-3">
                 {/* Workspace / Admin nav */}
                 <SidebarGroup className="px-3">
@@ -96,8 +83,22 @@ export function AppSidebar() {
 
             </SidebarContent>
 
-            <SidebarFooter className="p-3">
+            <SidebarFooter className="border-t border-violet-100 p-3">
                 <NavUser />
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            asChild
+                            tooltip={{ children: 'Log out' }}
+                            className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
+                        >
+                            <Link href={logout()} method="post" as="button">
+                                <LogOut />
+                                <span>Log out</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
             </SidebarFooter>
         </Sidebar>
     );

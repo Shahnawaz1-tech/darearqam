@@ -47,9 +47,6 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
 
     const sidebar = (
         <aside className="flex h-full w-[248px] shrink-0 flex-col border-e border-[var(--student-border)] bg-white" aria-label={t.dashboardNav}>
-            <div className="flex justify-center border-b border-[var(--student-border)] px-5 py-4">
-                <AppLogoIcon className="size-10 rounded-lg bg-[#f8f5e9] object-contain" />
-            </div>
             <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
                 {navGroups.map((group) => <div key={group.label}>
                     <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.14em] text-slate-400">{group.label}</p>

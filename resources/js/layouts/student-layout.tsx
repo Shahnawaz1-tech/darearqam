@@ -60,10 +60,6 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
 
     const sidebar = (
         <aside className="student-sidebar flex h-full w-[248px] shrink-0 flex-col border-e border-[var(--student-border)] bg-white" aria-label={t.dashboardNav}>
-                <div className="flex items-center gap-3 border-b border-[var(--student-border)] px-5 py-5">
-                <AppLogoIcon className="size-10 rounded-lg bg-[#f8f5e9] object-contain" />
-                <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-800">{t.brand}</p><p className="text-[10px] text-slate-500" dir="ltr">{t.brandLatin}</p></div>
-            </div>
             <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
                 {navGroups.map((group) => (
                     <div key={group.label}>
@@ -79,12 +75,17 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
                     </div>
                 ))}
             </nav>
-            <div className="grid grid-cols-5 gap-1 border-t border-[var(--student-border)] p-3" aria-label={t.quickActions}>
+            <div className="grid grid-cols-4 gap-1 border-t border-[var(--student-border)] p-3" aria-label={t.quickActions}>
                 {[[UserRound, studentProfile.url(), t.profileSettings], [Settings, '/settings/appearance', t.profile], [FileText, '/student/id-card', t.idCard], [HelpCircle, '#discussions', t.contactTeacher]].map(([Icon, href, label], i) => {
                     const Symbol = Icon as typeof UserRound;
                     return <Link key={i} href={href as string} aria-label={label as string} title={label as string} className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-[var(--brand)] hover:text-[var(--brand)]"><Symbol className="size-4" /></Link>;
                 })}
-                <Link href={logout()} method="post" as="button" aria-label={t.logout} title={t.logout} className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-rose-400 hover:text-rose-600"><LogOut className="size-4" /></Link>
+            </div>
+            <div className="border-t border-[var(--student-border)] p-3">
+                <Link href={logout()} method="post" as="button" onClick={() => setMobileOpen(false)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600">
+                    <LogOut className="size-[18px]" aria-hidden="true" />
+                    <span>{t.logout}</span>
+                </Link>
             </div>
         </aside>
     );
@@ -92,44 +93,45 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
     return (
         <StudentShellContext.Provider value={context}>
             <div className="student-app min-h-screen bg-[var(--page)] text-slate-800" lang={lang} dir={lang === 'ur' ? 'rtl' : 'ltr'} style={{ '--brand': '#6b3fe0', '--brand-soft': '#efe9fd', fontFamily: lang === 'ur' ? "'Noto Nastaliq Urdu', serif" : "'Inter', system-ui, sans-serif", lineHeight: lang === 'ur' ? 2.1 : 1.55 } as React.CSSProperties}>
-                <header className="sticky top-0 z-40 flex h-16 items-center gap-3 bg-[var(--brand)] px-3 text-white shadow-sm sm:px-5">
+                <header dir="ltr" className="sticky top-0 z-40 flex h-16 items-center gap-3 bg-[var(--brand)] px-3 text-white shadow-sm sm:px-5">
                     <button type="button" aria-label={t.dashboardNav} onClick={() => setMobileOpen((open) => !open)} className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/15 hover:bg-white/25 lg:hidden">{mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}</button>
-                    <button type="button" aria-label={t.dashboardNav} onClick={() => setMobileOpen((open) => !open)} className="hidden size-9 shrink-0 items-center justify-center rounded-lg bg-white/15 hover:bg-white/25 lg:flex"><Menu className="size-5" /></button>
                     <Link href="/student/dashboard" className="flex shrink-0 items-center gap-2">
                         <AppLogoIcon className="size-9 rounded-lg bg-[#f8f5e9] object-contain" />
                         <span className="hidden text-sm font-bold sm:inline">{t.brand}</span>
                     </Link>
-                    <label className="ms-auto flex h-9 min-w-0 max-w-[360px] flex-1 items-center gap-2 rounded-full bg-white px-3 text-slate-500 sm:ms-6">
-                        <Search className="size-4 shrink-0" aria-hidden="true" />
-                        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.search} aria-label={t.search} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-slate-400 sm:text-sm" />
-                    </label>
-                    <button type="button" onClick={changeLanguage} className="rounded-full border border-white/30 px-3 py-1 text-xs font-semibold hover:bg-white/15">{t.language}</button>
-                    <a href="#notices" aria-label={t.notifications} className="relative hidden size-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 sm:flex"><Bell className="size-4" /><span className="absolute -end-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--warn)] text-[9px] font-bold text-slate-900">{pageProps.kpis?.dueHomework ?? 0}</span></a>
-                    <a href="#discussions" aria-label={t.messages} className="hidden size-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 md:flex"><MessageCircle className="size-4" /></a>
-                    <a href="#resources" aria-label={t.bookmarks} className="hidden size-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 md:flex"><BookOpen className="size-4" /></a>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button type="button" aria-label={t.profileSettings} className="flex size-9 items-center justify-center overflow-hidden rounded-full border-2 border-white/70 bg-white/20 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-                                {auth.user?.avatar ? <img src={auth.user.avatar} alt="" className="size-full object-cover" /> : auth.user?.name?.charAt(0) ?? 'ط'}
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="min-w-52">
-                            <DropdownMenuLabel className="font-normal">
-                                <span className="block truncate text-sm font-semibold">{auth.user?.name}</span>
-                                <span className="block truncate text-xs text-muted-foreground">{auth.user?.email}</span>
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                                <Link href={studentProfile()}><UserRound className="size-4" />{t.profileSettings}</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href={logout()} method="post" as="button" className="w-full text-rose-700 focus:text-rose-700"><LogOut className="size-4" />{t.logout}</Link>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="ms-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+                        <label className="flex h-9 min-w-0 max-w-[360px] flex-1 items-center gap-2 rounded-full bg-white px-3 text-slate-500">
+                            <Search className="size-4 shrink-0" aria-hidden="true" />
+                            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.search} aria-label={t.search} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-slate-400 sm:text-sm" />
+                        </label>
+                        <button type="button" onClick={changeLanguage} className="shrink-0 rounded-full border border-white/30 px-3 py-1 text-xs font-semibold hover:bg-white/15">{t.language}</button>
+                        <a href="#notices" aria-label={t.notifications} className="relative hidden size-9 shrink-0 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 sm:flex"><Bell className="size-4" /><span className="absolute -end-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[var(--warn)] text-[9px] font-bold text-slate-900">{pageProps.kpis?.dueHomework ?? 0}</span></a>
+                        <a href="#discussions" aria-label={t.messages} className="hidden size-9 shrink-0 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 md:flex"><MessageCircle className="size-4" /></a>
+                        <a href="#resources" aria-label={t.bookmarks} className="hidden size-9 shrink-0 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 md:flex"><BookOpen className="size-4" /></a>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button type="button" aria-label={t.profileSettings} className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/70 bg-white/20 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                                    {auth.user?.avatar ? <img src={auth.user.avatar} alt="" className="size-full object-cover" /> : auth.user?.name?.charAt(0) ?? 'ط'}
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-52">
+                                <DropdownMenuLabel className="font-normal">
+                                    <span className="block truncate text-sm font-semibold">{auth.user?.name}</span>
+                                    <span className="block truncate text-xs text-muted-foreground">{auth.user?.email}</span>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                    <Link href={studentProfile()}><UserRound className="size-4" />{t.profileSettings}</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href={logout()} method="post" as="button" className="w-full text-rose-700 focus:text-rose-700"><LogOut className="size-4" />{t.logout}</Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </header>
                 <div className="flex min-h-[calc(100vh-4rem)] min-w-0">
-                    <div className="hidden shrink-0 lg:block">{sidebar}</div>
+                    <div className="sticky top-16 hidden h-[calc(100vh-4rem)] shrink-0 lg:block">{sidebar}</div>
                     {mobileOpen && <div className="fixed inset-0 z-50 flex lg:hidden"><button type="button" aria-label={t.close} onClick={() => setMobileOpen(false)} className="absolute inset-0 bg-slate-950/35" /><div className="relative z-10 h-full shadow-xl">{sidebar}</div></div>}
                     <div className="min-w-0 w-full flex-1">{children}</div>
                 </div>
