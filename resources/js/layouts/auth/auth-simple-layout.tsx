@@ -29,7 +29,7 @@ export default function AuthSimpleLayout({
                     />
                     <Link
                         href={home()}
-                        aria-label="Dar-e-Arqam Schools home"
+                        aria-label="Dar-e-Arqam Gurguri home"
                         className="relative z-10 flex flex-col items-center gap-1"
                     >
                         <span className="mb-1 flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-[#f7f4e8] p-1 shadow-md ring-1 ring-white/40">
@@ -39,7 +39,7 @@ export default function AuthSimpleLayout({
                             DAR-E-ARQAM
                         </span>
                         <span className="text-[10px] font-semibold tracking-[0.3em] text-white/90">
-                            SCHOOLS
+                            GURGURI
                         </span>
                     </Link>
                     <div
