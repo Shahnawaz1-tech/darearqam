@@ -6,20 +6,20 @@ import {
     CalendarCheck,
     GraduationCap,
     LayoutDashboard,
-    LogOut,
     UserRound,
     UsersRound,
     Wallet,
 } from 'lucide-react';
 import { useCurrentUrl } from '@/hooks/use-current-url';
+import AppLogo from '@/components/app-logo';
 import { NavUser } from '@/components/nav-user';
-import { logout } from '@/routes';
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarGroup,
     SidebarGroupLabel,
+    SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
@@ -57,6 +57,15 @@ export function AppSidebar() {
 
     return (
         <Sidebar collapsible="icon" variant="inset" className="border-r border-violet-800/20 bg-white">
+            <SidebarHeader>
+                <Link
+                    href={isAdmin ? '/admin/dashboard' : '/'}
+                    aria-label="Madrasa Dar-e-Arqam Gurguri"
+                    className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+                >
+                    <AppLogo />
+                </Link>
+            </SidebarHeader>
             <SidebarContent className="px-1 pt-3">
                 {/* Workspace / Admin nav */}
                 <SidebarGroup className="px-3">
@@ -83,22 +92,8 @@ export function AppSidebar() {
 
             </SidebarContent>
 
-            <SidebarFooter className="border-t border-violet-100 p-3">
+            <SidebarFooter className="border-t border-sidebar-border/70 p-2">
                 <NavUser />
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton
-                            asChild
-                            tooltip={{ children: 'Log out' }}
-                            className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
-                        >
-                            <Link href={logout()} method="post" as="button">
-                                <LogOut />
-                                <span>Log out</span>
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
             </SidebarFooter>
         </Sidebar>
     );

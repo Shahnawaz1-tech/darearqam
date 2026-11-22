@@ -2,9 +2,11 @@ import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Bell, Search } from 'lucide-react';
 import { usePage } from '@inertiajs/react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useInitials } from '@/hooks/use-initials';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { UserMenuContent } from '@/components/user-menu-content';
 import type { AppLayoutProps } from '@/types';
@@ -21,8 +23,10 @@ export default function AppSidebarLayout({
 
 function LayoutFrame({ children }: { children: React.ReactNode }) {
     const page = usePage();
+    const user = page.props.auth.user;
     const { state } = useSidebar();
     const isMobile = useIsMobile();
+    const getInitials = useInitials();
     const contentMargin = isMobile
         ? 0
         : state === 'collapsed'
@@ -75,19 +79,28 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
                             <Bell className="size-4" aria-hidden="true" />
                             <span className="absolute top-2 right-2 size-1.5 rounded-full bg-emerald-500 ring-2 ring-white" />
                         </button>
-                        {page.props.auth.user && (
+                        {user && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button
                                         type="button"
-                                        aria-label="Profile"
-                                        className="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-white/70 bg-white/20 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                        aria-label={`Profile menu for ${user.name}`}
+                                        className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/70 bg-white/20 p-0 text-white shadow-sm transition hover:border-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                                     >
-                                        {page.props.auth.user.name.charAt(0)}
+                                        <Avatar className="size-full">
+                                            <AvatarImage
+                                                src={user.avatar ?? undefined}
+                                                alt={user.name}
+                                                className="size-full object-cover"
+                                            />
+                                            <AvatarFallback className="bg-white/20 text-xs font-semibold text-white">
+                                                {getInitials(user.name)}
+                                            </AvatarFallback>
+                                        </Avatar>
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="min-w-52">
-                                    <UserMenuContent user={page.props.auth.user} />
+                                    <UserMenuContent user={user} />
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}

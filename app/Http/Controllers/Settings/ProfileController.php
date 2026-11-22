@@ -10,8 +10,11 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 class ProfileController extends Controller
 {
@@ -50,13 +53,39 @@ class ProfileController extends Controller
     private function saveProfileInformation(ProfileUpdateRequest $request): void
     {
         $user = $request->user();
-        $user->fill($request->validated());
+        $previousAvatarPath = $user->avatar_path;
+        $profile = $request->safe()->only(['name', 'email', 'phone']);
+
+        if ($request->hasFile('avatar')) {
+            $avatarPath = $request->file('avatar')->storePublicly('avatars', 'public');
+
+            if (! is_string($avatarPath)) {
+                throw new RuntimeException('Unable to store the profile avatar.');
+            }
+
+            $user->avatar_path = $avatarPath;
+        } elseif ($request->boolean('remove_avatar')) {
+            $user->avatar_path = null;
+        }
+
+        $user->fill($profile);
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
 
         $user->save();
+
+        if ($previousAvatarPath && $user->avatar_path !== $previousAvatarPath) {
+            $disk = Storage::disk('public');
+
+            if ($disk->exists($previousAvatarPath) && ! $disk->delete($previousAvatarPath)) {
+                Log::warning('Failed to remove a replaced profile avatar.', [
+                    'user_id' => $user->id,
+                    'avatar_path' => $previousAvatarPath,
+                ]);
+            }
+        }
     }
 
     /**

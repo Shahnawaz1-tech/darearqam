@@ -43,7 +43,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user()?->makeVisible('phone'),
                 'is_platform_admin' => (bool) $request->user()?->isPlatformAdmin(),
             ],
             'flash' => [

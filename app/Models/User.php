@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\TenantContext;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
-use App\Tenancy\TenantContext;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property int $id
@@ -34,12 +35,15 @@ use App\Tenancy\TenantContext;
     'password',
     'phone',
     'is_parent_account',
+    'avatar_path',
     'two_factor_secret',
     'two_factor_recovery_codes',
     'remember_token',
 ])]
 class User extends Authenticatable implements MustVerifyEmail
 {
+    protected $appends = ['avatar'];
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
@@ -83,6 +87,13 @@ class User extends Authenticatable implements MustVerifyEmail
             ->whereKey($current->getKey())
             ->wherePivotIn('role', [Tenant::ROLE_OWNER, Tenant::ROLE_ADMIN])
             ->exists();
+    }
+
+    public function getAvatarAttribute(): ?string
+    {
+        return $this->avatar_path
+            ? Storage::disk('public')->url($this->avatar_path)
+            : null;
     }
 
     /**
