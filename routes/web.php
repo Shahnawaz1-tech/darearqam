@@ -6,8 +6,9 @@ use App\Http\Controllers\Admin\ClearApplicationCachesController;
 use App\Http\Controllers\Admin\DashboardStatsController;
 use App\Http\Controllers\Admin\FeeController;
 use App\Http\Controllers\Admin\NoticeController;
-use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\StaffAttendanceController;
 use App\Http\Controllers\Admin\StaffController;
+use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ResultController;
@@ -16,10 +17,10 @@ use App\Http\Controllers\Settings\ProfileController as SettingsProfileController
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\Student\StudentActionController;
 use App\Http\Controllers\Student\StudentDocumentController;
+use App\Http\Controllers\Teacher\ActionController as TeacherActionController;
+use App\Http\Controllers\Teacher\DashboardController as TeacherDashboardController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\WelcomeController;
-use App\Http\Controllers\Teacher\DashboardController as TeacherDashboardController;
-use App\Http\Controllers\Teacher\ActionController as TeacherActionController;
 use App\Http\Middleware\RequireTenantRole;
 use Illuminate\Support\Facades\Route;
 
@@ -64,6 +65,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Attendance
         Route::get('admin/attendance', [AttendanceController::class, 'index'])->name('admin.attendance.index');
         Route::post('admin/attendance', [AttendanceController::class, 'store'])->name('admin.attendance.store');
+        Route::delete('admin/attendance/{attendance}', [AttendanceController::class, 'destroy'])
+            ->name('admin.attendance.destroy');
+        Route::post('admin/attendance/staff', [StaffAttendanceController::class, 'store'])
+            ->name('admin.attendance.staff.store');
+        Route::delete('admin/attendance/staff/{staffAttendance}', [StaffAttendanceController::class, 'destroy'])
+            ->name('admin.attendance.staff.destroy');
 
         // Fees
         Route::get('admin/fees', [FeeController::class, 'index'])->name('admin.fees.index');

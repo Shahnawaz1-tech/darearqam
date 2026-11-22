@@ -41,6 +41,9 @@ class Student extends Model
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * @return BelongsTo<MadrasaClass, $this>
+     */
     public function class(): BelongsTo
     {
         return $this->belongsTo(MadrasaClass::class, 'class_id');
@@ -56,6 +59,9 @@ class Student extends Model
         return $this->hasMany(Fee::class);
     }
 
+    /**
+     * @return HasMany<Attendance, $this>
+     */
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
