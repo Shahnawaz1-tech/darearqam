@@ -1,17 +1,25 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     ChevronLeft,
     ChevronRight,
+    GraduationCap,
     PlusCircle,
     Search,
     Trash2,
     UserPen,
+    UsersRound,
     X,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    destroy,
+    index,
+    store,
+    update,
+} from '@/actions/App/Http/Controllers/Admin/StudentController';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +36,14 @@ interface Student {
 interface ClassOption {
     id: number;
     name: string;
+    is_active: boolean;
+    students_count: number;
+    active_students_count: number;
+}
+
+interface StudentOverview {
+    total_students: number;
+    active_students: number;
 }
 
 interface PaginationLink {
@@ -54,6 +70,7 @@ interface Filters {
 interface Props extends Record<string, unknown> {
     students: PaginatedStudents;
     classes: ClassOption[];
+    overview: StudentOverview;
     filters: Filters;
 }
 
@@ -138,8 +155,9 @@ function StudentFormFields({
 }) {
     const field = (key: keyof StudentFormData) => ({
         value: data[key],
-        onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-            onChange(key, e.target.value),
+        onChange: (
+            e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+        ) => onChange(key, e.target.value),
     });
 
     return (
@@ -155,22 +173,27 @@ function StudentFormFields({
 
             {/* Father name */}
             <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Father's Name</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Father's Name
+                </label>
                 <Input placeholder="Father's name" {...field('father_name')} />
                 <InputError message={errors.father_name} className="mt-1" />
             </div>
 
             {/* Class */}
             <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Class</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Class
+                </label>
                 <select
                     className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
                     {...field('class_id')}
                 >
                     <option value="">— Select class —</option>
                     {classes.map((c) => (
-                        <option key={c.id} value={c.id}>
+                        <option key={c.id} value={c.id} disabled={!c.is_active}>
                             {c.name}
+                            {c.is_active ? '' : ' (Inactive)'}
                         </option>
                     ))}
                 </select>
@@ -179,14 +202,18 @@ function StudentFormFields({
 
             {/* Roll number */}
             <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Roll Number</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Roll Number
+                </label>
                 <Input placeholder="e.g. 001" {...field('roll_number')} />
                 <InputError message={errors.roll_number} className="mt-1" />
             </div>
 
             {/* Gender */}
             <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Gender</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Gender
+                </label>
                 <select
                     className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
                     {...field('gender')}
@@ -200,7 +227,9 @@ function StudentFormFields({
 
             {/* Status */}
             <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Status</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Status
+                </label>
                 <select
                     className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
                     {...field('status')}
@@ -215,14 +244,18 @@ function StudentFormFields({
 
             {/* Admission date */}
             <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Admission Date</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Admission Date
+                </label>
                 <Input type="date" {...field('admission_date')} />
                 <InputError message={errors.admission_date} className="mt-1" />
             </div>
 
             {/* Session */}
             <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Session</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Session
+                </label>
                 <Input placeholder="e.g. 2024-25" {...field('session')} />
                 <InputError message={errors.session} className="mt-1" />
             </div>
@@ -232,7 +265,12 @@ function StudentFormFields({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function Students({ students, classes, filters }: Props) {
+export default function Students({
+    students,
+    classes,
+    overview,
+    filters,
+}: Props) {
     // Add form state
     const [showAdd, setShowAdd] = useState(false);
     const [addData, setAddData] = useState<StudentFormData>(emptyForm);
@@ -264,7 +302,7 @@ export default function Students({ students, classes, filters }: Props) {
         Object.entries(params).forEach(([k, v]) => {
             if (v !== undefined && v !== '') clean[k] = v;
         });
-        router.get('/admin/students', clean, { preserveState: true, replace: true });
+        router.get(index.url(), clean, { preserveState: true, replace: true });
     }
 
     function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -281,6 +319,11 @@ export default function Students({ students, classes, filters }: Props) {
         applyFilters({ class_id: val || undefined });
     }
 
+    function selectClass(id: string) {
+        setClassId(id);
+        applyFilters({ class_id: id || undefined });
+    }
+
     function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
         const val = e.target.value;
         setStatus(val);
@@ -291,10 +334,45 @@ export default function Students({ students, classes, filters }: Props) {
         setSearch('');
         setClassId('');
         setStatus('');
-        router.get('/admin/students', {}, { preserveState: true, replace: true });
+        router.get(index.url(), {}, { preserveState: true, replace: true });
     }
 
     const hasFilters = search || classId || status;
+
+    const groupedStudents = new Map<number | null, Student[]>();
+    students.data.forEach((student) => {
+        const key = student.class?.id ?? null;
+        groupedStudents.set(key, [
+            ...(groupedStudents.get(key) ?? []),
+            student,
+        ]);
+    });
+
+    const studentGroups: Array<{
+        id: number | string;
+        name: string;
+        students: Student[];
+    }> = [];
+
+    classes.forEach((classOption) => {
+        const classStudents = groupedStudents.get(classOption.id);
+        if (classStudents?.length) {
+            studentGroups.push({
+                id: classOption.id,
+                name: classOption.name,
+                students: classStudents,
+            });
+        }
+    });
+
+    const unassignedStudents = groupedStudents.get(null);
+    if (unassignedStudents?.length) {
+        studentGroups.push({
+            id: 'unassigned',
+            name: 'Unassigned',
+            students: unassignedStudents,
+        });
+    }
 
     // ── Add form ────────────────────────────────────────────────────────────
 
@@ -305,7 +383,7 @@ export default function Students({ students, classes, filters }: Props) {
     function submitAdd(e: React.FormEvent) {
         e.preventDefault();
         setAddProcessing(true);
-        router.post('/admin/students', addData as unknown as Record<string, string>, {
+        router.post(store.url(), addData as unknown as Record<string, string>, {
             onSuccess: () => {
                 setShowAdd(false);
                 setAddData(emptyForm);
@@ -336,21 +414,26 @@ export default function Students({ students, classes, filters }: Props) {
     function submitEdit(e: React.FormEvent, id: number) {
         e.preventDefault();
         setEditProcessing(true);
-        router.patch(`/admin/students/${id}`, editData as unknown as Record<string, string>, {
-            onSuccess: () => {
-                setEditingId(null);
-                setEditErrors({});
+        router.patch(
+            update.url({ student: id }),
+            editData as unknown as Record<string, string>,
+            {
+                onSuccess: () => {
+                    setEditingId(null);
+                    setEditErrors({});
+                },
+                onError: (errs) => setEditErrors(errs as FormErrors),
+                onFinish: () => setEditProcessing(false),
             },
-            onError: (errs) => setEditErrors(errs as FormErrors),
-            onFinish: () => setEditProcessing(false),
-        });
+        );
     }
 
     // ── Delete ──────────────────────────────────────────────────────────────
 
     function deleteStudent(id: number, name: string) {
-        if (!window.confirm(`Delete student "${name}"? This cannot be undone.`)) return;
-        router.delete(`/admin/students/${id}`);
+        if (!window.confirm(`Delete student "${name}"? This cannot be undone.`))
+            return;
+        router.delete(destroy.url({ student: id }));
     }
 
     // ── Pagination ──────────────────────────────────────────────────────────
@@ -365,15 +448,19 @@ export default function Students({ students, classes, filters }: Props) {
     return (
         <>
             <Head title="Students" />
-            <main className="min-h-[calc(100svh-72px)] flex flex-col gap-5 bg-[#f5f7f6] p-3 sm:p-5 lg:p-7">
-
+            <main className="flex min-h-[calc(100svh-72px)] flex-col gap-5 bg-[#f5f7f6] p-3 sm:p-5 lg:p-7">
                 {/* ── Page header ──────────────────────────────────────────── */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-xl font-semibold text-[#183b32] sm:text-2xl">Students</h1>
-                        <span className="rounded-full bg-[#1d5140]/10 px-2.5 py-0.5 text-sm font-semibold text-[#1d5140]">
-                            {students.total}
-                        </span>
+                        <h1 className="text-xl font-semibold text-[#183b32] sm:text-2xl">
+                            Students
+                        </h1>
+                        <div className="flex items-center gap-2 rounded-full bg-[#1d5140]/10 px-3 py-1 text-sm font-semibold text-[#1d5140]">
+                            <span>{overview.total_students}</span>
+                            <span className="text-xs font-medium text-[#1d5140]/70">
+                                · {overview.active_students} active
+                            </span>
+                        </div>
                     </div>
                     <Button
                         type="button"
@@ -389,10 +476,116 @@ export default function Students({ students, classes, filters }: Props) {
                     </Button>
                 </div>
 
+                {/* ── Class overview ──────────────────────────────────────── */}
+                <section className="space-y-3">
+                    <div className="flex flex-wrap items-end justify-between gap-2">
+                        <div>
+                            <h2 className="text-sm font-semibold text-[#183b32]">
+                                Browse by class
+                            </h2>
+                            <p className="text-xs text-slate-500">
+                                Choose a class to narrow the student list.
+                            </p>
+                        </div>
+                        <span className="text-xs text-slate-500">
+                            {classes.length} classes
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                        <button
+                            type="button"
+                            aria-pressed={!classId}
+                            onClick={() => selectClass('')}
+                            className={`rounded-xl border p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d5140] ${
+                                !classId
+                                    ? 'border-[#1d5140] bg-[#1d5140] text-white shadow-sm'
+                                    : 'border-slate-200 bg-white text-[#183b32] hover:border-[#1d5140]/40'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-semibold">
+                                    All Classes
+                                </span>
+                                <UsersRound
+                                    className="size-4 shrink-0 opacity-80"
+                                    aria-hidden="true"
+                                />
+                            </div>
+                            <p
+                                className={`mt-2 text-lg font-bold ${!classId ? 'text-white' : 'text-[#1d5140]'}`}
+                            >
+                                {overview.total_students}
+                            </p>
+                            <p
+                                className={`text-xs ${!classId ? 'text-white/75' : 'text-slate-500'}`}
+                            >
+                                {overview.active_students} active students
+                            </p>
+                        </button>
+
+                        {classes.map((classOption) => {
+                            const selected = classId === String(classOption.id);
+
+                            return (
+                                <button
+                                    key={classOption.id}
+                                    type="button"
+                                    aria-pressed={selected}
+                                    onClick={() =>
+                                        selectClass(String(classOption.id))
+                                    }
+                                    className={`rounded-xl border p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d5140] ${
+                                        selected
+                                            ? 'border-[#1d5140] bg-[#1d5140] text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-[#183b32] hover:border-[#1d5140]/40'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="truncate text-sm font-semibold">
+                                            {classOption.name}
+                                        </span>
+                                        <GraduationCap
+                                            className="size-4 shrink-0 opacity-80"
+                                            aria-hidden="true"
+                                        />
+                                    </div>
+                                    <p
+                                        className={`mt-2 text-lg font-bold ${selected ? 'text-white' : 'text-[#1d5140]'}`}
+                                    >
+                                        {classOption.students_count}
+                                    </p>
+                                    <div className="flex items-center justify-between gap-1">
+                                        <p
+                                            className={`text-xs ${selected ? 'text-white/75' : 'text-slate-500'}`}
+                                        >
+                                            {classOption.active_students_count}{' '}
+                                            active
+                                        </p>
+                                        {!classOption.is_active && (
+                                            <span
+                                                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                                                    selected
+                                                        ? 'bg-white/15 text-white'
+                                                        : 'bg-slate-100 text-slate-500'
+                                                }`}
+                                            >
+                                                Inactive
+                                            </span>
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </section>
+
                 {/* ── Add form (slide-down panel) ───────────────────────────── */}
                 {showAdd && (
                     <section className="rounded-2xl border border-[#1d5140]/20 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)] sm:p-6">
-                        <h2 className="mb-4 font-semibold text-[#183b32]">New Student</h2>
+                        <h2 className="mb-4 font-semibold text-[#183b32]">
+                            New Student
+                        </h2>
                         <form onSubmit={submitAdd} noValidate>
                             <StudentFormFields
                                 data={addData}
@@ -427,11 +620,14 @@ export default function Students({ students, classes, filters }: Props) {
                 {/* ── Filter bar ───────────────────────────────────────────── */}
                 <div className="flex flex-wrap gap-3">
                     {/* Search */}
-                    <div className="relative flex-1 min-w-48">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                    <div className="relative min-w-48 flex-1">
+                        <Search
+                            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+                            aria-hidden="true"
+                        />
                         <Input
                             type="search"
-                            placeholder="Search by name or roll no."
+                            placeholder="Search name, roll no. or father"
                             value={search}
                             onChange={handleSearchChange}
                             onKeyDown={handleSearchKey}
@@ -450,6 +646,7 @@ export default function Students({ students, classes, filters }: Props) {
                         {classes.map((c) => (
                             <option key={c.id} value={c.id}>
                                 {c.name}
+                                {c.is_active ? '' : ' (Inactive)'}
                             </option>
                         ))}
                     </select>
@@ -496,23 +693,50 @@ export default function Students({ students, classes, filters }: Props) {
 
                 {/* ── Students table ───────────────────────────────────────── */}
                 <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_12px_rgba(15,23,42,0.03)]">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5">
+                        <div>
+                            <h2 className="text-sm font-semibold text-[#183b32]">
+                                Student records
+                            </h2>
+                            <p className="text-xs text-slate-500">
+                                Showing {students.data.length} of{' '}
+                                {students.total} matching students
+                            </p>
+                        </div>
+                        {classId && (
+                            <span className="rounded-full bg-[#1d5140]/10 px-2.5 py-1 text-xs font-semibold text-[#1d5140]">
+                                {classes.find(
+                                    (classOption) =>
+                                        String(classOption.id) === classId,
+                                )?.name ?? 'Selected class'}
+                            </span>
+                        )}
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                                <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase">
                                     <th className="px-5 py-3">Roll #</th>
                                     <th className="px-4 py-3">Name</th>
-                                    <th className="px-4 py-3 hidden md:table-cell">Father</th>
-                                    <th className="px-4 py-3 hidden sm:table-cell">Class</th>
+                                    <th className="hidden px-4 py-3 md:table-cell">
+                                        Father
+                                    </th>
                                     <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3 hidden lg:table-cell">Admitted</th>
-                                    <th className="px-4 py-3 text-right">Actions</th>
+                                    <th className="hidden px-4 py-3 lg:table-cell">
+                                        Admitted
+                                    </th>
+                                    <th className="px-4 py-3 text-right">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {students.data.length === 0 ? (
+                                {studentGroups.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
+                                        <td
+                                            colSpan={6}
+                                            className="px-5 py-12 text-center text-sm text-slate-400"
+                                        >
                                             No students found.
                                             {hasFilters && (
                                                 <button
@@ -526,101 +750,189 @@ export default function Students({ students, classes, filters }: Props) {
                                         </td>
                                     </tr>
                                 ) : (
-                                    students.data.map((student) => (
-                                        <React.Fragment key={student.id}>
-                                            {/* Normal row */}
-                                            <tr className={`hover:bg-slate-50/60 transition-colors ${editingId === student.id ? 'bg-emerald-50/40' : ''}`}>
-                                                <td className="px-5 py-3 font-mono text-xs text-slate-500">
-                                                    {student.roll_number ?? '—'}
-                                                </td>
-                                                <td className="px-4 py-3 font-medium text-[#183b32]">{student.name}</td>
-                                                <td className="px-4 py-3 text-slate-500 hidden md:table-cell">
-                                                    {student.father_name ?? '—'}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-500 hidden sm:table-cell">
-                                                    {student.class?.name ?? '—'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span
-                                                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadge[student.status] ?? 'bg-slate-100 text-slate-600'}`}
-                                                    >
-                                                        {student.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-500 hidden lg:table-cell">
-                                                    {shortDate(student.admitted_at)}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        {editingId === student.id ? (
-                                                            <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={cancelEdit}
-                                                            >
-                                                                <X className="size-3.5" aria-hidden="true" />
-                                                                Cancel
-                                                            </Button>
-                                                        ) : (
-                                                            <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() => startEdit(student)}
-                                                            >
-                                                                <UserPen className="size-3.5" aria-hidden="true" />
-                                                                Edit
-                                                            </Button>
-                                                        )}
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => deleteStudent(student.id, student.name)}
-                                                            className="text-red-500 hover:bg-red-50 hover:text-red-700"
-                                                        >
-                                                            <Trash2 className="size-3.5" aria-hidden="true" />
-                                                            <span className="sr-only">Delete {student.name}</span>
-                                                        </Button>
+                                    studentGroups.map((group) => (
+                                        <React.Fragment
+                                            key={`group-${group.id}`}
+                                        >
+                                            <tr className="bg-[#1d5140]/[0.04]">
+                                                <th
+                                                    scope="rowgroup"
+                                                    colSpan={6}
+                                                    className="border-y border-[#1d5140]/10 px-5 py-2.5 text-left"
+                                                >
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <span className="font-semibold text-[#183b32]">
+                                                            {group.name}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-slate-500">
+                                                            {
+                                                                group.students
+                                                                    .length
+                                                            }{' '}
+                                                            shown on this page
+                                                        </span>
                                                     </div>
-                                                </td>
+                                                </th>
                                             </tr>
-
-                                            {/* Inline edit row */}
-                                            {editingId === student.id && (
-                                                <tr>
-                                                    <td colSpan={7} className="border-t border-[#1d5140]/10 bg-emerald-50/60 px-5 py-5">
-                                                        <form onSubmit={(e) => submitEdit(e, student.id)} noValidate>
-                                                            <p className="mb-3 text-xs font-semibold text-[#1d5140] uppercase tracking-wide">
-                                                                Editing: {student.name}
-                                                            </p>
-                                                            <StudentFormFields
-                                                                data={editData}
-                                                                errors={editErrors}
-                                                                classes={classes}
-                                                                onChange={handleEditField}
-                                                            />
-                                                            <div className="mt-4 flex gap-3">
-                                                                <Button
-                                                                    type="submit"
-                                                                    disabled={editProcessing}
-                                                                    className="bg-[#1d5140] text-white hover:bg-[#173f34]"
-                                                                >
-                                                                    {editProcessing ? 'Saving…' : 'Save Changes'}
-                                                                </Button>
+                                            {group.students.map((student) => (
+                                                <React.Fragment
+                                                    key={student.id}
+                                                >
+                                                    <tr
+                                                        className={`transition-colors hover:bg-slate-50/60 ${editingId === student.id ? 'bg-emerald-50/40' : ''}`}
+                                                    >
+                                                        <td className="px-5 py-3 font-mono text-xs text-slate-500">
+                                                            {student.roll_number ??
+                                                                '—'}
+                                                        </td>
+                                                        <td className="px-4 py-3 font-medium text-[#183b32]">
+                                                            {student.name}
+                                                        </td>
+                                                        <td className="hidden px-4 py-3 text-slate-500 md:table-cell">
+                                                            {student.father_name ??
+                                                                '—'}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <span
+                                                                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadge[student.status] ?? 'bg-slate-100 text-slate-600'}`}
+                                                            >
+                                                                {student.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="hidden px-4 py-3 text-slate-500 lg:table-cell">
+                                                            {shortDate(
+                                                                student.admitted_at,
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                {editingId ===
+                                                                student.id ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={
+                                                                            cancelEdit
+                                                                        }
+                                                                    >
+                                                                        <X
+                                                                            className="size-3.5"
+                                                                            aria-hidden="true"
+                                                                        />
+                                                                        Cancel
+                                                                    </Button>
+                                                                ) : (
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() =>
+                                                                            startEdit(
+                                                                                student,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <UserPen
+                                                                            className="size-3.5"
+                                                                            aria-hidden="true"
+                                                                        />
+                                                                        Edit
+                                                                    </Button>
+                                                                )}
                                                                 <Button
                                                                     type="button"
-                                                                    variant="outline"
-                                                                    onClick={cancelEdit}
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() =>
+                                                                        deleteStudent(
+                                                                            student.id,
+                                                                            student.name,
+                                                                        )
+                                                                    }
+                                                                    className="text-red-500 hover:bg-red-50 hover:text-red-700"
                                                                 >
-                                                                    Cancel
+                                                                    <Trash2
+                                                                        className="size-3.5"
+                                                                        aria-hidden="true"
+                                                                    />
+                                                                    <span className="sr-only">
+                                                                        Delete{' '}
+                                                                        {
+                                                                            student.name
+                                                                        }
+                                                                    </span>
                                                                 </Button>
                                                             </div>
-                                                        </form>
-                                                    </td>
-                                                </tr>
-                                            )}
+                                                        </td>
+                                                    </tr>
+
+                                                    {editingId ===
+                                                        student.id && (
+                                                        <tr>
+                                                            <td
+                                                                colSpan={6}
+                                                                className="border-t border-[#1d5140]/10 bg-emerald-50/60 px-5 py-5"
+                                                            >
+                                                                <form
+                                                                    onSubmit={(
+                                                                        e,
+                                                                    ) =>
+                                                                        submitEdit(
+                                                                            e,
+                                                                            student.id,
+                                                                        )
+                                                                    }
+                                                                    noValidate
+                                                                >
+                                                                    <p className="mb-3 text-xs font-semibold tracking-wide text-[#1d5140] uppercase">
+                                                                        Editing:{' '}
+                                                                        {
+                                                                            student.name
+                                                                        }
+                                                                    </p>
+                                                                    <StudentFormFields
+                                                                        data={
+                                                                            editData
+                                                                        }
+                                                                        errors={
+                                                                            editErrors
+                                                                        }
+                                                                        classes={
+                                                                            classes
+                                                                        }
+                                                                        onChange={
+                                                                            handleEditField
+                                                                        }
+                                                                    />
+                                                                    <div className="mt-4 flex gap-3">
+                                                                        <Button
+                                                                            type="submit"
+                                                                            disabled={
+                                                                                editProcessing
+                                                                            }
+                                                                            className="bg-[#1d5140] text-white hover:bg-[#173f34]"
+                                                                        >
+                                                                            {editProcessing
+                                                                                ? 'Saving…'
+                                                                                : 'Save Changes'}
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            onClick={
+                                                                                cancelEdit
+                                                                            }
+                                                                        >
+                                                                            Cancel
+                                                                        </Button>
+                                                                    </div>
+                                                                </form>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            ))}
                                         </React.Fragment>
                                     ))
                                 )}
@@ -632,8 +944,11 @@ export default function Students({ students, classes, filters }: Props) {
                     {students.last_page > 1 && (
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3.5">
                             <p className="text-xs text-slate-500">
-                                Page {students.current_page} of {students.last_page}
-                                <span className="ml-2 text-slate-400">({students.total} total)</span>
+                                Page {students.current_page} of{' '}
+                                {students.last_page}
+                                <span className="ml-2 text-slate-400">
+                                    ({students.total} total)
+                                </span>
                             </p>
 
                             <div className="flex items-center gap-1">
@@ -645,13 +960,17 @@ export default function Students({ students, classes, filters }: Props) {
                                     disabled={students.current_page === 1}
                                     onClick={() => {
                                         const prev = students.links.find(
-                                            (l) => l.label === '&laquo; Previous',
+                                            (l) =>
+                                                l.label === '&laquo; Previous',
                                         );
                                         goToPage(prev?.url ?? null);
                                     }}
                                     aria-label="Previous page"
                                 >
-                                    <ChevronLeft className="size-4" aria-hidden="true" />
+                                    <ChevronLeft
+                                        className="size-4"
+                                        aria-hidden="true"
+                                    />
                                 </Button>
 
                                 {/* Page numbers */}
@@ -666,7 +985,11 @@ export default function Students({ students, classes, filters }: Props) {
                                             key={i}
                                             type="button"
                                             size="sm"
-                                            variant={link.active ? 'default' : 'outline'}
+                                            variant={
+                                                link.active
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
                                             disabled={!link.url}
                                             onClick={() => goToPage(link.url)}
                                             className={
@@ -674,9 +997,15 @@ export default function Students({ students, classes, filters }: Props) {
                                                     ? 'bg-[#1d5140] text-white hover:bg-[#173f34]'
                                                     : ''
                                             }
-                                            aria-current={link.active ? 'page' : undefined}
+                                            aria-current={
+                                                link.active ? 'page' : undefined
+                                            }
                                         >
-                                            <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                            <span
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
+                                            />
                                         </Button>
                                     ))}
 
@@ -685,7 +1014,10 @@ export default function Students({ students, classes, filters }: Props) {
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    disabled={students.current_page === students.last_page}
+                                    disabled={
+                                        students.current_page ===
+                                        students.last_page
+                                    }
                                     onClick={() => {
                                         const next = students.links.find(
                                             (l) => l.label === 'Next &raquo;',
@@ -694,7 +1026,10 @@ export default function Students({ students, classes, filters }: Props) {
                                     }}
                                     aria-label="Next page"
                                 >
-                                    <ChevronRight className="size-4" aria-hidden="true" />
+                                    <ChevronRight
+                                        className="size-4"
+                                        aria-hidden="true"
+                                    />
                                 </Button>
                             </div>
                         </div>

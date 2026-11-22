@@ -7,6 +7,7 @@ use App\Models\MadrasaClass;
 use App\Models\Student;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -14,13 +15,36 @@ class StudentController extends Controller
 {
     public function index(Request $request): Response
     {
-        $students = Student::with('class:id,name')
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")
-                ->orWhere('roll_number', 'like', "%{$s}%")
-                ->orWhere('father_name', 'like', "%{$s}%"))
-            ->when($request->class_id, fn ($q, $c) => $q->where('class_id', $c))
-            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
-            ->latest()
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'class_id' => ['nullable', 'integer'],
+            'status' => ['nullable', Rule::in(['active', 'inactive', 'graduated', 'dropped'])],
+        ]);
+
+        $studentQuery = Student::query()
+            ->with('class:id,name');
+
+        if (($filters['search'] ?? '') !== '') {
+            $search = $filters['search'];
+
+            $studentQuery->where(fn ($query) => $query
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('roll_number', 'like', "%{$search}%")
+                ->orWhere('father_name', 'like', "%{$search}%"));
+        }
+
+        if (isset($filters['class_id'])) {
+            $studentQuery->where('class_id', $filters['class_id']);
+        }
+
+        if (isset($filters['status'])) {
+            $studentQuery->where('status', $filters['status']);
+        }
+
+        $students = $studentQuery
+            ->orderBy('class_id')
+            ->orderBy('roll_number')
+            ->orderBy('id')
             ->paginate(25)
             ->withQueryString()
             ->through(fn ($s) => [
@@ -33,12 +57,35 @@ class StudentController extends Controller
                 'admitted_at' => $s->admission_date?->toDateString(),
             ]);
 
-        $classes = MadrasaClass::active()->get(['id', 'name']);
+        $classes = MadrasaClass::query()
+            ->select(['id', 'name', 'is_active'])
+            ->withCount('students')
+            ->withCount([
+                'students as active_students_count' => fn ($query) => $query->where('status', 'active'),
+            ])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (MadrasaClass $class) => [
+                'id' => $class->id,
+                'name' => $class->name,
+                'is_active' => $class->is_active,
+                'students_count' => $class->students_count,
+                'active_students_count' => $class->active_students_count,
+            ])
+            ->values();
 
         return Inertia::render('admin/students', [
             'students' => $students,
-            'classes'  => $classes,
-            'filters'  => $request->only(['search', 'class_id', 'status']),
+            'classes' => $classes,
+            'overview' => [
+                'total_students' => Student::count(),
+                'active_students' => Student::where('status', 'active')->count(),
+            ],
+            'filters' => [
+                'search' => $filters['search'] ?? '',
+                'class_id' => isset($filters['class_id']) ? (string) $filters['class_id'] : '',
+                'status' => $filters['status'] ?? '',
+            ],
         ]);
     }
 
