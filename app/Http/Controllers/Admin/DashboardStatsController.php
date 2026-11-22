@@ -8,6 +8,7 @@ use App\Models\Fee;
 use App\Models\MadrasaClass;
 use App\Models\Notice;
 use App\Models\Student;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\Request;
@@ -98,12 +99,21 @@ class DashboardStatsController extends Controller
         }
 
         return Inertia::render('admin/dashboard', [
+            'tenantName' => $tenant->name,
+            'userName' => $request->user()?->name ?? 'Administrator',
+            'todayDate' => $today->toDateString(),
+            'todayLabel' => $today->format('l, j F Y'),
+            'currentMonthLabel' => $today->format('F Y'),
             'members' => $members,
             'stats' => [
                 'totalStudents' => $totalStudents,
                 'activeStudents' => $activeStudents,
                 'totalClasses' => $classes->count(),
-                'staffCount' => $members->filter(fn ($m) => in_array($m['role'], ['staff', 'member']))->count(),
+                'staffCount' => $members->filter(fn ($m) => in_array($m['role'], [
+                    Tenant::ROLE_STAFF,
+                    Tenant::ROLE_MEMBER,
+                    Tenant::ROLE_ADMIN,
+                ]))->count(),
                 'presentToday' => $presentToday,
                 'absentToday' => $absentToday,
                 'lateToday' => $lateToday,

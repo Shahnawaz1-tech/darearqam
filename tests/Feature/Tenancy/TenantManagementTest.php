@@ -112,6 +112,10 @@ test('the dashboard shows members of only the active tenant', function () {
         ->get(route('admin.dashboard'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('admin/dashboard')
+            ->where('tenantName', 'Active Madrasa')
+            ->where('userName', $owner->name)
+            ->where('todayDate', now()->toDateString())
+            ->where('currentMonthLabel', now()->format('F Y'))
             ->has('members', 1)
             ->where('members.0.email', $owner->email));
 });
