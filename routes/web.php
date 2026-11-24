@@ -5,7 +5,9 @@ use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\ClearApplicationCachesController;
 use App\Http\Controllers\Admin\DashboardStatsController;
 use App\Http\Controllers\Admin\FeeController;
+use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\NoticeController;
+use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\StaffAttendanceController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\StudentController;
@@ -43,6 +45,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Admin stats dashboard
         Route::get('admin/dashboard', DashboardStatsController::class)
             ->name('admin.dashboard');
+
+        // Global search & real-time notifications
+        Route::get('admin/search', GlobalSearchController::class)->name('admin.search');
+        Route::get('admin/notifications', [NotificationController::class, 'index'])->name('admin.notifications.index');
+        Route::post('admin/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('admin.notifications.read');
+        Route::post('admin/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('admin.notifications.mark-all-read');
+        Route::delete('admin/notifications/{id}', [NotificationController::class, 'destroy'])->name('admin.notifications.destroy');
 
         // Students
         Route::get('admin/students', [StudentController::class, 'index'])->name('admin.students.index');
