@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 use App\Models\Tenant;
+use App\Tenancy\TenantContext;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,11 +22,33 @@ class ProfileController extends Controller
     /**
      * Show the user's profile settings page.
      */
-    public function edit(Request $request): Response
+    public function edit(Request $request, TenantContext $tenantContext): Response
     {
+        $user = $request->user();
+        $tenant = $tenantContext->current();
+
         return Inertia::render('settings/profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'tenant' => $tenant ? [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'role' => $tenant->pivot?->role ?? 'admin',
+            ] : null,
+            'userData' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'avatar' => $user->avatar,
+                'is_parent_account' => $user->is_parent_account,
+                'is_verified' => $user->email_verified_at !== null,
+                'email_verified_at' => $user->email_verified_at?->format('d M Y'),
+                'created_at' => $user->created_at?->format('F Y') ?? 'Recent',
+                'two_factor_enabled' => ! is_null($user->two_factor_secret),
+                'is_platform_admin' => $user->isPlatformAdmin(),
+                'is_madrasa_admin' => $user->isMadrasaAdmin(),
+            ],
         ]);
     }
 
@@ -64,7 +87,7 @@ class ProfileController extends Controller
             }
 
             $user->avatar_path = $avatarPath;
-        } elseif ($request->boolean('remove_avatar')) {
+        } elseif ($request->boolean('remove_avatar') || $request->input('remove_avatar') === '1' || $request->input('remove_avatar') === 'true') {
             $user->avatar_path = null;
         }
 
