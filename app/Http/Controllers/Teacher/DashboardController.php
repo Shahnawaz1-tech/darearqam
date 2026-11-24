@@ -35,7 +35,7 @@ class DashboardController extends Controller
 
         $props = Cache::remember(
             "teacher-dashboard:v2:{$tenantId}:{$user->id}",
-            now()->addSeconds(60),
+            now()->addSeconds(15),
             fn (): array => $this->payload($tenantId, $tenant, (int) $user->id, $classIds, $today),
         );
 

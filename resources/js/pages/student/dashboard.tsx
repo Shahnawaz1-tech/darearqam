@@ -1,5 +1,5 @@
 import { Head, usePage, usePoll } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, Bell, CalendarDays, FileText, GraduationCap, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bell, CalendarDays, FileText, GraduationCap, Search, Wallet } from 'lucide-react';
 import { useStudentShell } from '@/layouts/student-layout';
 import {
     AttendanceGauge, CourseGrid, Discussion, ExamResult, FeeWidget, HifzDiary, HomeworkList,
@@ -31,9 +31,9 @@ type Props = Record<string, unknown> & {
 };
 
 export default function StudentDashboard(props: Props) {
-    const { t, search, lang } = useStudentShell();
+    const { t, search, setSearch, lang } = useStudentShell();
     const page = usePage<Props>();
-    usePoll(60000, { only: ['kpis', 'upcoming', 'homework', 'notices', 'messages'] }, { keepAlive: false });
+    usePoll(30000, { only: ['student', 'kpis', 'courses', 'upcoming', 'homework', 'studyHours', 'attendance', 'threads', 'messages', 'fees', 'latestResult', 'upcomingExams', 'hifz', 'remarks', 'leave', 'points', 'notices', 'resources', 'prayer'] }, { background: 'pause' });
 
     const query = search.trim().toLocaleLowerCase();
     const matches = (values: (string | null | undefined)[]) => !query || values.some((value) => value?.toLocaleLowerCase().includes(query));
@@ -53,6 +53,10 @@ export default function StudentDashboard(props: Props) {
             <div className="mx-auto flex w-full max-w-[1680px] min-w-0 flex-col gap-4">
                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-3"><span className="flex size-11 items-center justify-center rounded-xl border border-[var(--student-border)] bg-white text-[var(--brand)]"><GraduationCap className="size-5" /></span><div><h1 className="text-xl font-bold text-slate-800 sm:text-2xl">{t.dashboardTitle}</h1><p className="text-xs text-slate-500">{t.breadcrumb} <DirectionIcon className="mx-1 inline size-3" /> {t.dashboardTitle}</p></div></div>
+                    <label className="flex h-10 min-w-0 items-center gap-2 rounded-xl border border-[var(--student-border)] bg-white px-3 text-slate-500 shadow-sm sm:max-w-xs sm:flex-1">
+                        <Search className="size-4 shrink-0" aria-hidden="true" />
+                        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.search} aria-label={t.search} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-slate-400" />
+                    </label>
                     <div className="flex flex-wrap gap-2">{shortcutItems.map(([Icon, label, href], i) => <a key={href} href={href} title={label} aria-label={label} className="flex size-9 items-center justify-center rounded-full border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow" style={{ borderColor: ['var(--info)', 'var(--warn)', 'var(--ok)', 'var(--danger)', 'var(--brand)'][i], color: ['var(--info)', '#a56a00', 'var(--ok)', 'var(--danger)', 'var(--brand)'][i] }}><Icon className="size-4" /></a>)}</div>
                 </div>
 

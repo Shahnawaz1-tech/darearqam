@@ -27,7 +27,7 @@ class DashboardController extends Controller
 
         $props = Cache::remember(
             "student-dashboard:v2:{$tenant->id}:{$student->id}",
-            now()->addSeconds(60),
+            now()->addSeconds(15),
             fn (): array => $this->normalizeDashboardPayload($this->dashboardData($student, $tenant)),
         );
 

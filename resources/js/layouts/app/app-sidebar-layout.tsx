@@ -7,13 +7,15 @@ import { Bell, Search } from 'lucide-react';
 import { usePage } from '@inertiajs/react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useInitials } from '@/hooks/use-initials';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { UserMenuContent } from '@/components/user-menu-content';
 import type { AppLayoutProps } from '@/types';
 
-export default function AppSidebarLayout({
-    children,
-}: AppLayoutProps) {
+export default function AppSidebarLayout({ children }: AppLayoutProps) {
     return (
         <AppShell variant="sidebar">
             <LayoutFrame>{children}</LayoutFrame>
@@ -40,13 +42,19 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
             ? 'Classes'
             : page.url.startsWith('/admin/staff')
               ? 'Teachers'
-            : page.url.startsWith('/admin/attendance')
-              ? 'Attendance'
-              : page.url.startsWith('/admin/fees')
-                ? 'Fees'
-                : page.url.startsWith('/admin/notices')
-                  ? 'Notices'
-                  : 'Dashboard';
+              : page.url.startsWith('/admin/attendance')
+                ? 'Attendance'
+                : page.url.startsWith('/admin/fees')
+                  ? 'Fees'
+                  : page.url.startsWith('/admin/notices')
+                    ? 'Notices'
+                    : page.url.startsWith('/student/dashboard')
+                      ? 'Student Dashboard'
+                      : page.url.startsWith('/student/profile')
+                        ? 'Student Profile'
+                        : page.url.startsWith('/staff/dashboard')
+                          ? 'Staff Dashboard'
+                          : 'Dashboard';
 
     return (
         <>
@@ -60,16 +68,24 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
                     <div className="flex min-w-0 items-center gap-3">
                         <SidebarTrigger className="size-9 shrink-0 rounded-lg border border-white/20 bg-white/10 text-white shadow-sm hover:bg-white/20" />
                         <div className="min-w-0">
-                            <p className="text-[10px] font-semibold tracking-[0.16em] text-violet-200 uppercase">Madrasa workspace</p>
-                            <h1 className="truncate text-base font-semibold text-white sm:text-lg">{title}</h1>
+                            <p className="text-[10px] font-semibold tracking-[0.16em] text-violet-200 uppercase">
+                                Madrasa workspace
+                            </p>
+                            <h1 className="truncate text-base font-semibold text-white sm:text-lg">
+                                {title}
+                            </h1>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                         <label className="hidden h-9 w-40 items-center gap-2 rounded-full border border-white/20 bg-white px-3 text-slate-400 md:flex lg:w-64">
                             <Search className="size-4" aria-hidden="true" />
-                            <span className="truncate text-sm">Search workspace</span>
-                            <kbd className="ml-auto hidden shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 lg:inline">Ctrl K</kbd>
+                            <span className="truncate text-sm">
+                                Search workspace
+                            </span>
+                            <kbd className="ml-auto hidden shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 lg:inline">
+                                Ctrl K
+                            </kbd>
                         </label>
                         <button
                             type="button"
@@ -99,7 +115,10 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
                                         </Avatar>
                                     </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="min-w-52">
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="min-w-52"
+                                >
                                     <UserMenuContent user={user} />
                                 </DropdownMenuContent>
                             </DropdownMenu>

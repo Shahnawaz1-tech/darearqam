@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ElementType } from 'react';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage, usePoll } from '@inertiajs/react';
 import {
     AlertCircle,
     CalendarDays,
@@ -248,6 +248,7 @@ export default function Attendance({
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const busy = saving || deleting;
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [view, setView] = useState<View>(filters.view);
     const page = usePage();
@@ -305,6 +306,22 @@ export default function Attendance({
     const staffHasChanges = staff.some(
         (member) => staffStatus[member.id] !== member.status,
     );
+    const hasChanges = studentHasChanges || staffHasChanges;
+    const { start: startPolling, stop: stopPolling } = usePoll(
+        30000,
+        { only: ['students', 'staff', 'classes', 'date', 'filters'] },
+        { autoStart: false, background: 'pause' },
+    );
+
+    useEffect(() => {
+        if (busy || hasChanges) {
+            stopPolling();
+        } else {
+            startPolling();
+        }
+
+        return stopPolling;
+    }, [busy, hasChanges, startPolling, stopPolling]);
 
     function visitAttendance(
         next: Partial<{ date: string; class_id: string; view: View }>,
@@ -414,7 +431,6 @@ export default function Attendance({
     }
 
     const summary = view === 'students' ? studentSummary : staffSummary;
-    const busy = saving || deleting;
 
     return (
         <>

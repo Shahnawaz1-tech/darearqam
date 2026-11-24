@@ -9,7 +9,7 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "inertiajs/inertia-laravel": "^3.0",
         "laravel/chisel": "^0.1.0",
         "laravel/fortify": "^1.37.2",
@@ -46,9 +46,11 @@
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
-            "npm install",
+            "@php artisan optimize:clear",
+            "npm ci",
             "npm run build"
         ],
         "dev": [
@@ -109,7 +111,7 @@
         "preferred-install": "dist",
         "sort-packages": true,
         "platform": {
-            "php": "8.3.33"
+            "php": "8.4.27"
         },
         "allow-plugins": {
             "pestphp/pest-plugin": true,
