@@ -435,8 +435,8 @@ export default function Attendance({
     return (
         <>
             <Head title="Attendance management" />
-            <main className="min-h-[calc(100svh-72px)] bg-slate-50 p-3 sm:p-5 lg:p-7">
-                <div className="mx-auto max-w-7xl">
+            <main className="min-h-[calc(100svh-72px)] w-full bg-slate-50 p-3 sm:p-4 lg:p-5">
+                <div className="w-full">
                     <section className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-700 px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                             <div>
