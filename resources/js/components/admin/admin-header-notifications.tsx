@@ -254,21 +254,15 @@ export function AdminHeaderNotifications() {
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="relative flex size-9.5 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-sm backdrop-blur-md transition-all duration-200 hover:scale-105 hover:border-white/35 hover:bg-white/20 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    className="relative flex size-9.5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-2xs transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5b4bf7]/30"
                     aria-label={`Notifications (${unreadCount} unread)`}
                 >
                     <Bell className="size-4.5 transition-transform group-hover:rotate-12" />
 
                     {unreadCount > 0 && (
-                        <>
-                            {/* Animated glowing ping circle */}
-                            <span className="absolute -top-1 -right-1 flex size-5">
-                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-rose-400 opacity-75" />
-                                <span className="relative inline-flex size-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-xs ring-2 ring-violet-700">
-                                    {unreadCount > 9 ? '9+' : unreadCount}
-                                </span>
-                            </span>
-                        </>
+                        <span className="absolute -top-1 -right-1 flex size-4.5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-2xs ring-2 ring-white">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
                     )}
                 </button>
             </DropdownMenuTrigger>

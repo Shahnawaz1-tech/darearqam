@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
@@ -36,6 +37,15 @@ const pageTitles: [string, string][] = [
     ['/staff/dashboard', 'Staff Dashboard'],
 ];
 
+function formatHeaderDateTime(date: Date): string {
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+    const dayNum = date.toLocaleDateString('en-US', { day: '2-digit' });
+    const year = date.getFullYear();
+    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dayName}, ${monthName} ${dayNum}, ${year} | ${timeStr}`;
+}
+
 export default function AppSidebarLayout({ children }: AppLayoutProps) {
     return (
         <AppShell variant="sidebar">
@@ -50,44 +60,51 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
     const { state } = useSidebar();
     const isMobile = useIsMobile();
     const getInitials = useInitials();
+    const [currentTime, setCurrentTime] = useState<string>(() => formatHeaderDateTime(new Date()));
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(formatHeaderDateTime(new Date()));
+        }, 15000);
+        return () => clearInterval(timer);
+    }, []);
+
     const contentMargin = isMobile
         ? 0
         : state === 'collapsed'
           ? 'var(--sidebar-width-icon)'
           : 'var(--sidebar-width)';
-    const title =
-        pageTitles.find(([prefix]) => page.url.startsWith(prefix))?.[1] ??
-        'Dashboard';
 
     return (
         <>
             <AppSidebar />
             <AppContent
                 variant="sidebar"
-                className="min-w-0 overflow-x-clip"
+                className="min-w-0 overflow-x-clip bg-[#f4f6fb]"
                 style={{ marginLeft: contentMargin }}
             >
-                <header className="sticky top-0 z-30 flex h-[68px] shrink-0 items-center justify-between border-b border-violet-600/40 bg-gradient-to-r from-violet-800 via-purple-700 to-indigo-800 px-4 text-white shadow-md backdrop-blur-xl sm:px-6 lg:px-8">
+                {/* Clean Modern White Header matching image UI */}
+                <header className="sticky top-0 z-30 flex h-[66px] shrink-0 items-center justify-between border-b border-slate-200/90 bg-white px-4 text-slate-800 shadow-2xs sm:px-6 lg:px-8">
+                    {/* Left: Sidebar Toggle + Search Input */}
                     <div className="flex min-w-0 items-center gap-3">
-                        <SidebarTrigger className="size-9 shrink-0 rounded-xl border border-white/20 bg-white/10 text-white shadow-xs backdrop-blur-md transition-all hover:scale-105 hover:bg-white/20 hover:shadow-sm" />
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                                <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                                <p className="text-[10px] font-semibold tracking-[0.18em] text-violet-200 uppercase">
-                                    Madrasa workspace
-                                </p>
-                            </div>
-                            <h1 className="truncate text-base font-bold text-white sm:text-lg tracking-tight">
-                                {title}
-                            </h1>
-                        </div>
+                        <SidebarTrigger className="size-9 shrink-0 rounded-xl border border-slate-200 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 hover:text-slate-900" />
+                        <AdminHeaderSearch />
                     </div>
 
-                    <div className="flex items-center gap-2.5 sm:gap-3">
-                        {/* Dynamic Global Search with Ctrl+K */}
-                        <AdminHeaderSearch />
+                    {/* Right: Live status + Date/Time + Notifications + User Avatar */}
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        {/* Live Status Pill */}
+                        <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600">
+                            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Live</span>
+                        </div>
 
-                        {/* Real-time Interactive Notifications */}
+                        {/* Formatted Date & Time */}
+                        <div className="hidden text-xs font-medium text-slate-500 xl:inline-block">
+                            {currentTime}
+                        </div>
+
+                        {/* Real-time Notifications Bell */}
                         <AdminHeaderNotifications />
 
                         {/* User Profile Menu */}
@@ -97,7 +114,7 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
                                     <button
                                         type="button"
                                         aria-label={`Profile menu for ${user.name}`}
-                                        className="relative flex size-9.5 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/70 bg-white/20 p-0 text-white shadow-sm transition-all hover:scale-105 hover:border-white hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                        className="relative flex size-9.5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 p-0 text-slate-700 shadow-2xs transition-all hover:border-slate-300 hover:shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4bf7]"
                                     >
                                         <Avatar className="size-full">
                                             <AvatarImage
@@ -105,7 +122,7 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
                                                 alt={user.name}
                                                 className="size-full object-cover"
                                             />
-                                            <AvatarFallback className="bg-white/20 text-xs font-bold text-white">
+                                            <AvatarFallback className="bg-gradient-to-tr from-violet-600 to-indigo-600 text-xs font-bold text-white">
                                                 {getInitials(user.name)}
                                             </AvatarFallback>
                                         </Avatar>

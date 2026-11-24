@@ -210,21 +210,18 @@ export function AdminHeaderSearch() {
 
     return (
         <>
-            {/* Header Search Trigger Button */}
+            {/* Header Search Trigger Button matching image UI */}
             <button
                 type="button"
                 onClick={() => setIsOpen(true)}
-                className="group relative flex h-9.5 items-center gap-2.5 rounded-full border border-white/20 bg-white/10 px-3.5 text-xs text-white/90 shadow-sm backdrop-blur-md transition-all duration-200 hover:border-white/35 hover:bg-white/20 hover:text-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 md:w-56 lg:w-72"
+                className="group relative flex h-10 items-center gap-2.5 rounded-xl border border-slate-200/80 bg-[#f4f6fb] px-3.5 text-xs text-slate-600 shadow-2xs transition-all duration-200 hover:border-slate-300 hover:bg-white hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5b4bf7]/30 w-44 sm:w-60 md:w-72 lg:w-80"
                 aria-label="Search workspace (Ctrl+K)"
             >
-                <Search className="size-4 shrink-0 text-white/70 transition-transform duration-200 group-hover:scale-110 group-hover:text-white" />
-                <span className="hidden truncate font-medium md:inline-block">
-                    Search students, staff, classes...
+                <Search className="size-4 shrink-0 text-slate-400 transition-transform duration-200 group-hover:scale-110 group-hover:text-slate-600" />
+                <span className="truncate text-xs font-normal text-slate-400 group-hover:text-slate-600">
+                    Search students, classes...
                 </span>
-                <span className="inline-block truncate font-medium md:hidden">
-                    Search...
-                </span>
-                <kbd className="ml-auto hidden items-center gap-0.5 rounded-md border border-white/20 bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold text-white/80 shadow-xs backdrop-blur-sm sm:flex">
+                <kbd className="ml-auto hidden items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 shadow-2xs sm:flex">
                     <Command className="size-2.5" /> K
                 </kbd>
             </button>
