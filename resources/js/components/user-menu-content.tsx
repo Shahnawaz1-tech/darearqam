@@ -1,4 +1,4 @@
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { LogOut, Palette, ShieldCheck, UserRound } from 'lucide-react';
 import {
     DropdownMenuGroup,
@@ -20,6 +20,9 @@ type Props = {
 
 export function UserMenuContent({ user }: Props) {
     const cleanup = useMobileNavigation();
+    const { tenancy } = usePage<{ tenancy: { current?: { role: string } } }>().props;
+    const isStudent = tenancy.current?.role === 'student';
+    const profileUrl = isStudent ? '/student/profile' : edit();
 
     const handleLogout = () => {
         cleanup();
@@ -38,7 +41,7 @@ export function UserMenuContent({ user }: Props) {
                 <DropdownMenuItem asChild>
                     <Link
                         className="block w-full cursor-pointer"
-                        href={edit()}
+                        href={profileUrl}
                         prefetch
                         onClick={cleanup}
                     >

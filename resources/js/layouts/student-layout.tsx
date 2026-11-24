@@ -15,6 +15,7 @@ type ShellContextValue = {
     t: StudentCopy;
     search: string;
     setSearch: (value: string) => void;
+    setLang: (value: Lang) => void;
 };
 const StudentShellContext = createContext<ShellContextValue | null>(null);
 
@@ -39,7 +40,20 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
     }, []);
 
     const context = useMemo(
-        () => ({ lang, t: COPY[lang], search, setSearch }),
+        () => ({
+            lang,
+            t: COPY[lang],
+            search,
+            setSearch,
+            setLang: (value: Lang) => {
+                setLang(value);
+                try {
+                    localStorage.setItem('lang', value);
+                } catch {
+                    /* local storage may be unavailable */
+                }
+            },
+        }),
         [lang, search],
     );
 

@@ -19,6 +19,49 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request, TenantContext $context): Response
     {
+        return $this->renderPage($request, $context);
+    }
+
+    public function courses(Request $request, TenantContext $context): Response
+    {
+        return $this->renderPage($request, $context, 'courses');
+    }
+
+    public function timetable(Request $request, TenantContext $context): Response
+    {
+        return $this->renderPage($request, $context, 'timetable');
+    }
+
+    public function attendance(Request $request, TenantContext $context): Response
+    {
+        return $this->renderPage($request, $context, 'attendance');
+    }
+
+    public function homework(Request $request, TenantContext $context): Response
+    {
+        return $this->renderPage($request, $context, 'homework');
+    }
+
+    public function results(Request $request, TenantContext $context): Response
+    {
+        return $this->renderPage($request, $context, 'results');
+    }
+
+    public function fees(Request $request, TenantContext $context): Response
+    {
+        return $this->renderPage($request, $context, 'fees');
+    }
+
+    public function notices(Request $request, TenantContext $context): Response
+    {
+        return $this->renderPage($request, $context, 'notices');
+    }
+
+    private function renderPage(
+        Request $request,
+        TenantContext $context,
+        ?string $section = null,
+    ): Response {
         $tenant = $context->current();
         abort_unless($tenant instanceof Tenant, 403);
 
@@ -26,12 +69,15 @@ class DashboardController extends Controller
         abort_unless($student !== null, 403);
 
         $props = Cache::remember(
-            "student-dashboard:v2:{$tenant->id}:{$student->id}",
+            "student-dashboard:v3:{$tenant->id}:{$student->id}",
             now()->addSeconds(15),
             fn (): array => $this->normalizeDashboardPayload($this->dashboardData($student, $tenant)),
         );
 
-        return Inertia::render('student/dashboard', $props);
+        return Inertia::render(
+            $section === null ? 'student/dashboard' : 'student/section',
+            [...$props, 'section' => $section],
+        );
     }
 
     /** @return array<string, mixed> */
@@ -65,12 +111,36 @@ class DashboardController extends Controller
                 $start = CarbonImmutable::parse($today->toDateString().' '.$slot->starts_at, $today->timezone);
                 $end = CarbonImmutable::parse($today->toDateString().' '.$slot->ends_at, $today->timezone);
                 $now = CarbonImmutable::now($today->timezone);
+
                 return [
                     'id' => (int) $slot->id, 'subject' => $slot->subject ?? '', 'topic' => '',
                     'teacher' => $slot->teacher ?? '', 'startsAt' => $start->toIso8601String(),
                     'endsAt' => $end->toIso8601String(), 'room' => $slot->room ?? '',
                     'liveUrl' => $slot->live_url, 'isPast' => $end->lessThan($now),
                     'minutesUntil' => max(0, (int) $now->diffInMinutes($start, false)),
+                ];
+            })->values() : collect();
+
+        $weeklyTimetable = $classId ? DB::table('timetable_slots as s')
+            ->leftJoin('courses as c', 'c.id', '=', 's.course_id')
+            ->leftJoin('users as u', 'u.id', '=', 's.teacher_id')
+            ->where('s.tenant_id', $tenantId)->where('s.class_id', $classId)
+            ->select('s.id', 's.weekday', 's.starts_at', 's.ends_at', 's.room', 's.live_url', 'c.title as subject', 'u.name as teacher')
+            ->orderBy('s.weekday')->orderBy('s.starts_at')->limit(70)->get()
+            ->map(function ($slot) use ($today): array {
+                $slotDate = $today->subDays($today->dayOfWeek)->addDays((int) $slot->weekday);
+                $start = CarbonImmutable::parse($slotDate->toDateString().' '.$slot->starts_at, $today->timezone);
+                $end = CarbonImmutable::parse($slotDate->toDateString().' '.$slot->ends_at, $today->timezone);
+
+                return [
+                    'id' => (int) $slot->id,
+                    'weekday' => (int) $slot->weekday,
+                    'subject' => $slot->subject ?? '',
+                    'teacher' => $slot->teacher ?? '',
+                    'startsAt' => $start->toIso8601String(),
+                    'endsAt' => $end->toIso8601String(),
+                    'room' => $slot->room ?? '',
+                    'liveUrl' => $slot->live_url,
                 ];
             })->values() : collect();
 
@@ -127,6 +197,7 @@ class DashboardController extends Controller
         $groupedExams = $examRows->groupBy('exam_id')->values();
         $examAverage = static function ($rows): float {
             $total = (int) $rows->sum('total');
+
             return $total > 0 ? round(((int) $rows->sum('marks') / $total) * 100, 1) : 0.0;
         };
         $latestExamRows = $groupedExams->first() ?? collect();
@@ -141,6 +212,24 @@ class DashboardController extends Controller
             'subjects' => $latestExamRows->map(fn ($row): array => ['name' => $row->subject, 'marks' => (int) $row->marks, 'total' => (int) $row->total])->values(),
             'examId' => (int) $latestExamRows->first()->exam_id,
         ];
+        $resultHistory = $groupedExams->map(function ($rows) use ($examAverage): array {
+            $percent = $examAverage($rows);
+
+            return [
+                'exam' => $rows->first()->exam_title,
+                'date' => $rows->first()->exam_date,
+                'marks' => (int) $rows->sum('marks'),
+                'total' => (int) $rows->sum('total'),
+                'percent' => $percent,
+                'grade' => $this->grade($percent),
+                'examId' => (int) $rows->first()->exam_id,
+                'subjects' => $rows->map(fn ($row): array => [
+                    'name' => $row->subject,
+                    'marks' => (int) $row->marks,
+                    'total' => (int) $row->total,
+                ])->values(),
+            ];
+        })->values();
 
         $homeworkPending = $homework->filter(fn ($item) => in_array($item['status'], ['pending', 'late'], true));
         $overdueHomework = $homeworkPending->filter(fn ($item) => $item['dueAt'] && CarbonImmutable::parse($item['dueAt'], $timezone)->isPast())->count();
@@ -154,7 +243,9 @@ class DashboardController extends Controller
         $threadIds = $threads->pluck('id')->all();
         $messages = $threadIds ? DB::table('thread_messages as m')->leftJoin('users as u', 'u.id', '=', 'm.author_id')
             ->leftJoin('tenant_user as tu', fn ($join) => $join->on('tu.user_id', '=', 'm.author_id')->where('tu.tenant_id', '=', $tenantId))
-            ->where('m.tenant_id', $tenantId)->whereIn('m.thread_id', $threadIds)->where(function ($q) use ($tenantId): void { $q->whereNull('m.author_id')->orWhereNotNull('tu.tenant_id'); })
+            ->where('m.tenant_id', $tenantId)->whereIn('m.thread_id', $threadIds)->where(function ($q): void {
+                $q->whereNull('m.author_id')->orWhereNotNull('tu.tenant_id');
+            })
             ->orderByDesc('m.created_at')->select('m.id', 'm.thread_id', 'm.body', 'm.tag', 'm.created_at', 'u.name as author')->get()->groupBy('thread_id') : collect();
         $discussion = $threads->map(fn ($thread): array => [
             'id' => (int) $thread->id, 'title' => $thread->title, 'tag' => $thread->tag,
@@ -180,7 +271,9 @@ class DashboardController extends Controller
             ->get(['hifz_logs.id', 'hifz_logs.date', 'hifz_logs.type', 'hifz_logs.from_ref', 'hifz_logs.to_ref', 'hifz_logs.rating', 'hifz_logs.remarks', 'u.name as teacher']);
         $paras = [];
         foreach ($hifzLogs as $log) {
-            if ($log->type === 'sabaq' && preg_match('/(?:پارہ|para)\s*(\d+)/iu', $log->from_ref, $match)) $paras[$match[1]] = true;
+            if ($log->type === 'sabaq' && preg_match('/(?:پارہ|para)\s*(\d+)/iu', $log->from_ref, $match)) {
+                $paras[$match[1]] = true;
+            }
         }
         $hifz = [
             'parasDone' => count($paras), 'today' => $hifzLogs->filter(fn ($log) => $log->date === $today->toDateString())->map(fn ($log): array => ['id' => (int) $log->id, 'type' => $log->type, 'from' => $log->from_ref, 'to' => $log->to_ref, 'rating' => $log->rating, 'remarks' => $log->remarks, 'teacher' => $log->teacher ?? ''])->values(),
@@ -188,7 +281,9 @@ class DashboardController extends Controller
         ];
 
         $notices = DB::table('notices')->where('tenant_id', $tenantId)->where('is_published', true)
-            ->where(function ($q) use ($classId): void { $q->whereIn('audience', ['all', 'students'])->orWhere(fn ($sub) => $sub->where('audience', 'class')->where('class_id', $classId)); })
+            ->where(function ($q) use ($classId): void {
+                $q->whereIn('audience', ['all', 'students'])->orWhere(fn ($sub) => $sub->where('audience', 'class')->where('class_id', $classId));
+            })
             ->orderByDesc('published_at')->limit(6)->get(['id', 'title', 'body', 'type', 'published_at'])->map(fn ($notice): array => ['id' => (int) $notice->id, 'title' => $notice->title, 'body' => $notice->body ?? '', 'type' => $notice->type, 'date' => $notice->published_at, 'isNew' => $notice->published_at !== null && CarbonImmutable::parse($notice->published_at)->greaterThanOrEqualTo($today->subDays(7))])->values();
         $resources = DB::table('resources')->where('tenant_id', $tenantId)->where(fn ($q) => $q->whereNull('class_id')->orWhere('class_id', $classId))->orderBy('category')->limit(12)->get(['id', 'category', 'title', 'file_path'])->map(fn ($resource): array => ['id' => (int) $resource->id, 'category' => $resource->category, 'title' => $resource->title, 'url' => Storage::disk('public')->url($resource->file_path)])->values();
         $remarks = DB::table('student_remarks as r')->leftJoin('users as u', 'u.id', '=', 'r.teacher_id')->where('r.tenant_id', $tenantId)->where('r.student_id', $studentId)->orderByDesc('r.date')->limit(5)->get(['r.id', 'r.category', 'r.body', 'r.date', 'u.name as teacher'])->map(fn ($remark): array => ['id' => (int) $remark->id, 'category' => $remark->category, 'body' => $remark->body, 'date' => $remark->date, 'teacher' => $remark->teacher ?? ''])->values();
@@ -203,12 +298,14 @@ class DashboardController extends Controller
             'kpis' => $stats,
             'courses' => $courses->map(fn ($course): array => ['id' => (int) $course->id, 'title' => $course->title, 'teacher' => $course->teacher ?? '', 'progress' => (int) ($course->percent ?? 0), 'tags' => is_string($course->tags) ? json_decode($course->tags, true) ?: [] : ($course->tags ?? []), 'cover' => $course->cover_path ? Storage::disk('public')->url($course->cover_path) : null])->values(),
             'upcoming' => $upcoming,
+            'timetable' => $weeklyTimetable,
             'homework' => $homework,
             'studyHours' => ['thisWeek' => round($thisWeekHours, 1), 'lastWeek' => round($lastWeekHours, 1), 'days' => $days],
             'attendance' => ['percent' => $attendancePct, 'present' => $present, 'absent' => $absent, 'total' => $attendanceTotal, 'trend' => $attendancePct >= 90 ? 'steady' : ($attendancePct >= 75 ? 'watch' : 'dropping')],
             'threads' => $discussion, 'messages' => $discussion,
             'fees' => ['month' => $month, 'amount' => $feeAmount, 'paid' => $feePaid, 'balance' => max(0, $feeAmount - $feePaid), 'dueDate' => $dueDate, 'overdue' => $monthFees->contains(fn ($fee) => $fee->status === 'pending' && $fee->due_date && CarbonImmutable::parse($fee->due_date)->isPast()), 'history' => $feeHistory],
             'latestResult' => $latestResult,
+            'resultsHistory' => $resultHistory,
             'upcomingExams' => $upcomingExams,
             'hifz' => $hifz,
             'remarks' => $remarks,
@@ -222,11 +319,13 @@ class DashboardController extends Controller
 
     private function grade(float $percent): string
     {
-        return match (true) { $percent >= 90 => 'A+', $percent >= 80 => 'A', $percent >= 70 => 'B', $percent >= 60 => 'C', default => 'D' };
+        return match (true) {
+            $percent >= 90 => 'A+', $percent >= 80 => 'A', $percent >= 70 => 'B', $percent >= 60 => 'C', default => 'D'
+        };
     }
 
     /** @param array<string, mixed> $payload
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function normalizeDashboardPayload(array $payload): array
     {
@@ -272,6 +371,7 @@ class DashboardController extends Controller
         $noon = 720 - (4 * $lon) - $eq + $offset;
         $hourAngle = static function (float $altitude) use ($lat, $decl): float {
             $cosH = (sin(deg2rad($altitude)) - sin($lat) * sin($decl)) / (cos($lat) * cos($decl));
+
             return rad2deg(acos(max(-1, min(1, $cosH)))) * 4;
         };
         $asrAltitude = rad2deg(atan(1 / (1 + tan(abs($lat - $decl)))));
@@ -280,6 +380,7 @@ class DashboardController extends Controller
         foreach ($minutes as $name => $value) {
             $times[] = ['name' => $name, 'time' => $date->startOfDay()->addMinutes((int) round($value))->format('H:i')];
         }
+
         return ['city' => $tenant->prayer_city, 'hijri' => $hijri, 'times' => $times];
     }
 }

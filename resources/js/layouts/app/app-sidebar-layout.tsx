@@ -15,6 +15,26 @@ import {
 import { UserMenuContent } from '@/components/user-menu-content';
 import type { AppLayoutProps } from '@/types';
 
+const pageTitles: [string, string][] = [
+    ['/admin/dashboard', 'Overview'],
+    ['/admin/students', 'Students'],
+    ['/admin/classes', 'Classes'],
+    ['/admin/staff', 'Teachers'],
+    ['/admin/attendance', 'Attendance'],
+    ['/admin/fees', 'Fees'],
+    ['/admin/notices', 'Notices'],
+    ['/student/courses', 'My Courses'],
+    ['/student/timetable', 'Timetable'],
+    ['/student/attendance', 'Attendance'],
+    ['/student/homework', 'Homework'],
+    ['/student/results', 'Results'],
+    ['/student/fees', 'Fees'],
+    ['/student/notices', 'Notices'],
+    ['/student/dashboard', 'Student Dashboard'],
+    ['/student/profile', 'Student Profile'],
+    ['/staff/dashboard', 'Staff Dashboard'],
+];
+
 export default function AppSidebarLayout({ children }: AppLayoutProps) {
     return (
         <AppShell variant="sidebar">
@@ -34,27 +54,9 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
         : state === 'collapsed'
           ? 'var(--sidebar-width-icon)'
           : 'var(--sidebar-width)';
-    const title = page.url.startsWith('/admin/dashboard')
-        ? 'Overview'
-        : page.url.startsWith('/admin/students')
-          ? 'Students'
-          : page.url.startsWith('/admin/classes')
-            ? 'Classes'
-            : page.url.startsWith('/admin/staff')
-              ? 'Teachers'
-              : page.url.startsWith('/admin/attendance')
-                ? 'Attendance'
-                : page.url.startsWith('/admin/fees')
-                  ? 'Fees'
-                  : page.url.startsWith('/admin/notices')
-                    ? 'Notices'
-                    : page.url.startsWith('/student/dashboard')
-                      ? 'Student Dashboard'
-                      : page.url.startsWith('/student/profile')
-                        ? 'Student Profile'
-                        : page.url.startsWith('/staff/dashboard')
-                          ? 'Staff Dashboard'
-                          : 'Dashboard';
+    const title =
+        pageTitles.find(([prefix]) => page.url.startsWith(prefix))?.[1] ??
+        'Dashboard';
 
     return (
         <>

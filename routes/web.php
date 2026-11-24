@@ -103,6 +103,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('student/dashboard', StudentDashboardController::class)
         ->middleware(RequireTenantRole::class.':student')
         ->name('student.dashboard');
+    Route::get('student/courses', [StudentDashboardController::class, 'courses'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.courses');
+    Route::get('student/timetable', [StudentDashboardController::class, 'timetable'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.timetable');
+    Route::get('student/attendance', [StudentDashboardController::class, 'attendance'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.attendance');
+    Route::get('student/homework', [StudentDashboardController::class, 'homework'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.homework');
+    Route::get('student/results', [StudentDashboardController::class, 'results'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.results');
+    Route::get('student/fees', [StudentDashboardController::class, 'fees'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.fees');
+    Route::get('student/notices', [StudentDashboardController::class, 'notices'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.notices');
     Route::inertia('student/profile', 'student/profile')
         ->middleware(RequireTenantRole::class.':student')
         ->name('student.profile');

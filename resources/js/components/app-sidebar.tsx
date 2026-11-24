@@ -18,6 +18,17 @@ import {
     UsersRound,
     Wallet,
 } from 'lucide-react';
+import {
+    attendance as studentAttendance,
+    courses as studentCourses,
+    dashboard as studentDashboard,
+    fees as studentFees,
+    homework as studentHomework,
+    notices as studentNotices,
+    results as studentResults,
+    profile as studentProfile,
+    timetable as studentTimetable,
+} from '@/routes/student';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import AppLogo from '@/components/app-logo';
 import { NavUser } from '@/components/nav-user';
@@ -80,21 +91,41 @@ export function AppSidebar() {
           ? [
                 {
                     title: 'Dashboard',
-                    href: '/student/dashboard',
+                    href: studentDashboard.url(),
                     icon: LayoutDashboard,
                 },
-                { title: 'My courses', href: '#courses', icon: BookOpen },
-                { title: 'Timetable', href: '#timetable', icon: CalendarDays },
+                {
+                    title: 'My courses',
+                    href: studentCourses.url(),
+                    icon: BookOpen,
+                },
+                {
+                    title: 'Timetable',
+                    href: studentTimetable.url(),
+                    icon: CalendarDays,
+                },
                 {
                     title: 'Attendance',
-                    href: '#attendance',
+                    href: studentAttendance.url(),
                     icon: CalendarCheck,
                 },
-                { title: 'Homework', href: '#homework', icon: CheckSquare },
-                { title: 'Results', href: '#results', icon: GraduationCap },
-                { title: 'Fees', href: '#fees', icon: Wallet },
-                { title: 'Notices', href: '#notices', icon: Bell },
-                { title: 'Profile', href: '/student/profile', icon: UserRound },
+                {
+                    title: 'Homework',
+                    href: studentHomework.url(),
+                    icon: CheckSquare,
+                },
+                {
+                    title: 'Results',
+                    href: studentResults.url(),
+                    icon: GraduationCap,
+                },
+                { title: 'Fees', href: studentFees.url(), icon: Wallet },
+                { title: 'Notices', href: studentNotices.url(), icon: Bell },
+                {
+                    title: 'Profile',
+                    href: studentProfile.url(),
+                    icon: UserRound,
+                },
             ]
           : isStaff
             ? [
