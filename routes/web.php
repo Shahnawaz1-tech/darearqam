@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\BrandingController;
 use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\ClearApplicationCachesController;
 use App\Http\Controllers\Admin\DashboardStatsController;
@@ -45,6 +46,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Admin stats dashboard
         Route::get('admin/dashboard', DashboardStatsController::class)
             ->name('admin.dashboard');
+        Route::get('admin/settings', [BrandingController::class, 'edit'])
+            ->name('admin.settings.edit');
+        Route::post('admin/settings/logo', [BrandingController::class, 'updateLogo'])
+            ->name('admin.settings.logo.update');
+        Route::delete('admin/settings/logo', [BrandingController::class, 'removeLogo'])
+            ->name('admin.settings.logo.remove');
 
         // Global search & real-time notifications
         Route::get('admin/search', GlobalSearchController::class)->name('admin.search');

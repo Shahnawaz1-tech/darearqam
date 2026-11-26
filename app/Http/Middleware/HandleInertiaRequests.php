@@ -67,6 +67,9 @@ class HandleInertiaRequests extends Middleware
                         'id' => $tenantContext->current()->id,
                         'name' => $tenantContext->current()->name,
                         'role' => $tenantContext->current()->pivot->role,
+                        'logo_url' => $tenantContext->current()->logo_path
+                            ? '/storage/'.ltrim($tenantContext->current()->logo_path, '/')
+                            : '/madrasa-logo.png',
                     ]
                     : null,
             ],

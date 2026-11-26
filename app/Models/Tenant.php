@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
+ * @property string|null $logo_path
  * @property-read TenantMembership $pivot
  */
-#[Fillable(['name'])]
+#[Fillable(['name', 'logo_path'])]
 class Tenant extends Model
 {
     public const ROLE_OWNER = 'owner';

@@ -31,6 +31,7 @@ import {
     profile as studentProfile,
     timetable as studentTimetable,
 } from '@/routes/student';
+import { edit as adminSettings } from '@/routes/admin/settings';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -65,7 +66,7 @@ export function AppSidebar() {
         { title: 'Notices', href: '/admin/notices', icon: Bell },
         { title: 'Exams', href: '/admin/classes', icon: FileText },
         { title: 'Reports', href: '/admin/dashboard#reports', icon: BarChart3 },
-        { title: 'Settings', href: '/settings/profile', icon: Settings },
+        { title: 'Settings', href: adminSettings.url(), icon: Settings },
     ];
 
     const studentNavItems: NavItem[] = [
@@ -130,15 +131,12 @@ export function AppSidebar() {
                     }
                     className="flex flex-col items-center justify-center text-center group-data-[collapsible=icon]:px-0"
                 >
-                    {/* Golden Dome Emblem */}
                     <div className="relative mb-2 flex size-13 items-center justify-center rounded-full border-2 border-amber-300/60 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 p-2 shadow-lg shadow-amber-500/20">
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            className="size-7 text-emerald-950"
-                        >
-                            <path d="M12 2c.4 0 .7.3.7.7v1.1c2.8.5 5 2.9 5.3 5.9.1 1.4-.4 2.8-1.3 3.9v5.9c0 .8-.7 1.5-1.5 1.5H8.8c-.8 0-1.5-.7-1.5-1.5v-5.9c-.9-1.1-1.4-2.5-1.3-3.9.3-3 2.5-5.4 5.3-5.9V2.7c0-.4.3-.7.7-.7zm0 4.5c-2.3 0-4.2 1.8-4.4 4.1-.1 1.1.3 2.2 1 3h6.8c.7-.8 1.1-1.9 1-3-.2-2.3-2.1-4.1-4.4-4.1zM9.5 16v3.5h5V16h-5z" />
-                        </svg>
+                        <img
+                            src={tenancy.current?.logo_url ?? '/madrasa-logo.png'}
+                            alt={`${tenancy.current?.name ?? 'Madrasa'} logo`}
+                            className="size-full rounded-full object-contain"
+                        />
                         <span className="absolute -top-1 -right-1 flex size-3">
                             <span className="size-full animate-ping rounded-full bg-amber-300 opacity-60" />
                             <span className="relative size-3 rounded-full bg-amber-300" />

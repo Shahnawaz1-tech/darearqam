@@ -10,6 +10,7 @@ export type TenantSummary = {
     id: number;
     name: string;
     role: TenantRole;
+    logo_url?: string;
 };
 
 export type Tenancy = {
