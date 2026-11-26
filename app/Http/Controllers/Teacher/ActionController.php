@@ -5,11 +5,16 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Teacher\BulkAttendanceRequest;
 use App\Models\HomeworkSubmission;
+use App\Models\HifzLog;
+use App\Models\Student;
+use App\Models\StudentHifzEnrollment;
+use App\Models\StudentHifzMonthlySummary;
 use App\Models\Tenant;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Gate;
 
 class ActionController extends Controller
 {
@@ -90,17 +95,68 @@ class ActionController extends Controller
     public function hifz(Request $request, TenantContext $context)
     {
         $validated = $request->validate([
-            'student_id' => ['required', 'integer', 'exists:students,id'], 'date' => ['required', 'date'],
-            'type' => ['required', 'in:sabaq,sabqi,manzil'], 'from_ref' => ['required', 'string', 'max:80'],
-            'to_ref' => ['required', 'string', 'max:80'], 'rating' => ['nullable', 'in:excellent,good,needs_work'], 'remarks' => ['nullable', 'string', 'max:2000'],
+            'student_id' => ['required', 'integer', 'exists:students,id'],
+            'date' => ['required', 'date'],
+            'type' => ['required', 'in:sabaq,sabqi,manzil'],
+            'surah' => ['nullable', 'string', 'max:120'],
+            'ayat_from' => ['nullable', 'string', 'max:30'],
+            'ayat_to' => ['nullable', 'string', 'max:30'],
+            'sabaq_para' => ['nullable', 'string', 'max:40'],
+            'sabaq_revision' => ['nullable', 'string', 'max:120'],
+            'from_ref' => ['nullable', 'string', 'max:80'],
+            'to_ref' => ['nullable', 'string', 'max:80'],
+            'rating' => ['nullable', 'in:excellent,good,needs_work'],
+            'memorization_quality' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
         ]);
         $tenant = $context->current();
-        $student = DB::table('students')->where('tenant_id', $tenant->id)->where('id', $validated['student_id'])->first();
-        abort_unless($student !== null && in_array((int) $student->class_id, $this->assignedClassIds($request, $tenant), true), 403);
-        DB::table('hifz_logs')->updateOrInsert(
-            ['tenant_id' => $tenant->id, 'student_id' => $validated['student_id'], 'date' => $validated['date'], 'type' => $validated['type']],
-            ['from_ref' => $validated['from_ref'], 'to_ref' => $validated['to_ref'], 'rating' => $validated['rating'] ?? null, 'remarks' => $validated['remarks'] ?? null, 'teacher_id' => $request->user()->id, 'updated_at' => now(), 'created_at' => now()],
-        );
+        abort_unless($tenant !== null, 403);
+
+        $student = Student::findOrFail($validated['student_id']);
+        Gate::authorize('manageHifz', $student);
+        $enrollment = StudentHifzEnrollment::where('student_id', $student->id)
+            ->where('hifz_program', true)
+            ->first();
+        abort_unless($enrollment !== null, 422);
+
+        $isAdmin = $request->user()->isMadrasaAdmin();
+        $isAssignedHifzTeacher = (int) $enrollment->assigned_hifz_teacher_id === (int) $request->user()->id;
+        $isAssignedClassTeacher = in_array((int) $student->class_id, $this->assignedClassIds($request, $tenant), true);
+        abort_unless($isAdmin || $isAssignedHifzTeacher || $isAssignedClassTeacher, 403);
+
+        HifzLog::updateOrCreate([
+            'student_id' => $student->id,
+            'date' => $validated['date'],
+            'type' => $validated['type'],
+        ], [
+            ...$validated,
+            'teacher_id' => $request->user()->id,
+        ]);
+
+        $month = substr($validated['date'], 0, 7);
+        $logs = HifzLog::where('student_id', $student->id)
+            ->whereRaw("substr(date, 1, 7) = ?", [$month])
+            ->get();
+        $completedParas = $logs
+            ->pluck('sabaq_para')
+            ->merge($logs->pluck('from_ref'))
+            ->filter()
+            ->unique()
+            ->count();
+
+        StudentHifzMonthlySummary::updateOrCreate([
+            'student_id' => $student->id,
+            'month' => $month,
+        ], [
+            'sabaq_count' => $logs->where('type', 'sabaq')->count(),
+            'sabqi_count' => $logs->where('type', 'sabqi')->count(),
+            'manzil_count' => $logs->where('type', 'manzil')->count(),
+            'excellent_count' => $logs->where('rating', 'excellent')->count(),
+            'good_count' => $logs->where('rating', 'good')->count(),
+            'needs_work_count' => $logs->where('rating', 'needs_work')->count(),
+            'completed_paras' => $completedParas,
+        ]);
+
         return back()->with('success', 'Hifz entry saved.');
     }
 

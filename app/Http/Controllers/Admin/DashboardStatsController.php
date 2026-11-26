@@ -9,6 +9,10 @@ use App\Models\MadrasaClass;
 use App\Models\Notice;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Models\Exam;
+use App\Models\Branch;
+use App\Models\StudentSection;
+use App\Models\StudentFeePayment;
 use App\Models\User;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\Request;
@@ -25,6 +29,14 @@ class DashboardStatsController extends Controller
 
         $today = Carbon::today();
         $thisMonth = $today->format('Y-m');
+        $filters = $request->validate([
+            'academic_year' => ['nullable', 'string', 'max:20'],
+            'branch_id' => ['nullable', 'integer'],
+            'class_id' => ['nullable', 'integer'],
+            'section_id' => ['nullable', 'integer'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
 
         // ── Members ──────────────────────────────────────────────────────
         $members = $tenant->users()
@@ -37,8 +49,17 @@ class DashboardStatsController extends Controller
             ])->values();
 
         // ── Students ─────────────────────────────────────────────────────
-        $totalStudents = Student::count();
-        $activeStudents = Student::active()->count();
+        $studentQuery = Student::query()
+            ->when(isset($filters['academic_year']), fn ($q) => $q->where('academic_year', $filters['academic_year']))
+            ->when(isset($filters['branch_id']), fn ($q) => $q->where('branch_id', $filters['branch_id']))
+            ->when(isset($filters['class_id']), fn ($q) => $q->where('class_id', $filters['class_id']))
+            ->when(isset($filters['section_id']), fn ($q) => $q->where('section_id', $filters['section_id']))
+            ->when(isset($filters['date_from']), fn ($q) => $q->whereDate('admission_date', '>=', $filters['date_from']))
+            ->when(isset($filters['date_to']), fn ($q) => $q->whereDate('admission_date', '<=', $filters['date_to']));
+        $totalStudents = (clone $studentQuery)->count();
+        $activeStudents = (clone $studentQuery)->where('status', 'active')->count();
+        $pendingStudents = (clone $studentQuery)->where('status', 'pending_admission')->count();
+        $inactiveStudents = (clone $studentQuery)->whereIn('status', ['inactive', 'suspended', 'withdrawn'])->count();
 
         // ── Classes ──────────────────────────────────────────────────────
         $classes = MadrasaClass::active()
@@ -54,6 +75,7 @@ class DashboardStatsController extends Controller
 
         // ── Attendance today ─────────────────────────────────────────────
         $todayAttendance = Attendance::whereDate('date', $today)
+            ->when(isset($filters['class_id']), fn ($q) => $q->where('class_id', $filters['class_id']))
             ->selectRaw('status, count(*) as cnt')
             ->groupBy('status')
             ->pluck('cnt', 'status');
@@ -82,117 +104,85 @@ class DashboardStatsController extends Controller
                 'published_at' => $n->published_at?->toDateString(),
             ])->values();
 
-        // ── Students List ────────────────────────────────────────────────
-        $defaultStudents = [
-            [
-                'id' => 1,
-                'name' => 'محمد عمر',
-                'father_name' => 'نور محمد',
-                'class_name' => 'حفظ - سابع',
-                'roll_number' => '#0015',
-                'admission_date' => '05 Jun 2024',
-                'status' => 'active',
-            ],
-            [
-                'id' => 2,
-                'name' => 'سید میر',
-                'father_name' => 'اللہ بخش',
-                'class_name' => 'حفظ - سابع',
-                'roll_number' => '#0016',
-                'admission_date' => '20 Jan 2024',
-                'status' => 'active',
-            ],
-            [
-                'id' => 3,
-                'name' => 'مصطفیٰ زبیر',
-                'father_name' => 'حسین خان',
-                'class_name' => 'ناظرہ',
-                'roll_number' => '#0017',
-                'admission_date' => '13 Jun 2024',
-                'status' => 'active',
-            ],
-            [
-                'id' => 4,
-                'name' => 'حبیب الرحمن',
-                'father_name' => 'اسماعیل اللہ',
-                'class_name' => 'ناظرہ',
-                'roll_number' => '#0018',
-                'admission_date' => '09 Feb 2024',
-                'status' => 'active',
-            ],
-            [
-                'id' => 5,
-                'name' => 'فیضان علی',
-                'father_name' => 'ظفر علی',
-                'class_name' => 'ناظرہ',
-                'roll_number' => '#0019',
-                'admission_date' => '09 Apr 2024',
-                'status' => 'active',
-            ],
-        ];
+        $absentStudents = Attendance::with(['student:id,name,roll_number', 'class:id,name'])
+            ->whereDate('date', $today)
+            ->where('status', 'absent')
+            ->when(isset($filters['class_id']), fn ($q) => $q->where('class_id', $filters['class_id']))
+            ->limit(20)
+            ->get()
+            ->map(fn (Attendance $attendance): array => [
+                'id' => $attendance->student_id,
+                'name' => $attendance->student?->name,
+                'roll_number' => $attendance->student?->roll_number,
+                'class_name' => $attendance->class?->name,
+            ])->values();
 
-        $dbStudents = Student::with('class:id,name')
+        $upcomingExams = Exam::whereDate('exam_date', '>=', $today)
+            ->where('is_published', true)
+            ->when(isset($filters['class_id']), fn ($q) => $q->where('class_id', $filters['class_id']))
+            ->orderBy('exam_date')
+            ->limit(10)
+            ->get(['id', 'title', 'exam_date', 'class_id'])
+            ->map(fn (Exam $exam): array => [
+                'id' => $exam->id,
+                'title' => $exam->title,
+                'date' => $exam->exam_date?->toDateString(),
+            ])->values();
+
+        $recentPayments = StudentFeePayment::with('student:id,name,roll_number')
+            ->latest('paid_at')
+            ->limit(10)
+            ->get()
+            ->map(fn (StudentFeePayment $payment): array => [
+                'id' => $payment->id,
+                'student' => $payment->student?->name,
+                'amount' => $payment->amount,
+                'paid_at' => $payment->paid_at?->toDateString(),
+                'receipt' => $payment->receipt_number,
+            ])->values();
+
+        // ── Students List ────────────────────────────────────────────────
+        $studentsList = (clone $studentQuery)
+            ->with('class:id,name')
             ->latest('id')
             ->limit(10)
             ->get()
-            ->map(fn ($s, $idx) => [
+            ->map(fn ($s) => [
                 'id' => $s->id,
                 'name' => $s->name,
                 'father_name' => $s->father_name ?? '—',
-                'class_name' => $s->class?->name ?? 'ناظرہ',
-                'roll_number' => $s->roll_number ? (str_starts_with($s->roll_number, '#') ? $s->roll_number : '#'.$s->roll_number) : sprintf('#%04d', $s->id),
-                'admission_date' => $s->admission_date ? $s->admission_date->format('d M Y') : '01 Jan 2024',
+                'class_name' => $s->class?->name ?? 'Unassigned',
+                'roll_number' => $s->roll_number ? (str_starts_with($s->roll_number, '#') ? $s->roll_number : '#'.$s->roll_number) : '#'.$s->admission_number,
+                'admission_date' => $s->admission_date ? $s->admission_date->format('d M Y') : '—',
                 'status' => $s->status ?? 'active',
             ])->values()->all();
 
-        $studentsList = count($dbStudents) >= 5 ? $dbStudents : $defaultStudents;
-
         // ── Recent Activities ────────────────────────────────────────────
-        $activities = [
-            [
-                'id' => 1,
+        $activities = Student::latest('created_at')
+            ->limit(5)
+            ->get()
+            ->map(fn (Student $student): array => [
+                'id' => $student->id,
                 'title' => 'New student added',
-                'description' => 'Ahmed Raza enrolled in Hifz Class',
-                'time' => '2m ago',
+                'description' => $student->name.' enrolled'.($student->class_id ? '' : ' (unassigned)'),
+                'time' => $student->created_at?->diffForHumans(),
                 'type' => 'student',
                 'color' => 'emerald',
-            ],
-            [
-                'id' => 2,
-                'title' => 'Attendance marked',
-                'description' => 'Class: Nazra Jamat 1',
-                'time' => '5m ago',
-                'type' => 'attendance',
-                'color' => 'blue',
-            ],
-            [
-                'id' => 3,
-                'title' => 'Fee received',
-                'description' => 'Rs. 5,000 from Muhammad Ali',
-                'time' => '12m ago',
-                'type' => 'fee',
-                'color' => 'amber',
-            ],
-            [
-                'id' => 4,
-                'title' => 'New notice published',
-                'description' => 'Annual Exam Schedule',
-                'time' => '1h ago',
-                'type' => 'notice',
-                'color' => 'purple',
-            ],
-        ];
+            ])->values()->all();
 
         // ── Attendance trend (last 7 days) ───────────────────────────────
-        $trend = [
-            ['day' => 'Mon', 'rate' => 58],
-            ['day' => 'Tue', 'rate' => 70],
-            ['day' => 'Wed', 'rate' => 72],
-            ['day' => 'Thu', 'rate' => 85],
-            ['day' => 'Fri', 'rate' => 90],
-            ['day' => 'Sat', 'rate' => 95],
-            ['day' => 'Sun', 'rate' => 84],
-        ];
+        $trend = collect(range(6, 0))
+            ->map(function (int $daysAgo) use ($tenant): array {
+                $day = Carbon::today()->subDays($daysAgo);
+                $records = Attendance::whereDate('date', $day);
+                $total = (clone $records)->count();
+                $present = (clone $records)->whereIn('status', ['present', 'late'])->count();
+
+                return [
+                    'day' => $day->format('D'),
+                    'rate' => $total > 0 ? round(($present / $total) * 100, 1) : 0,
+                ];
+            })->values()->all();
 
         return Inertia::render('admin/dashboard', [
             'tenantName' => $tenant->name,
@@ -202,13 +192,21 @@ class DashboardStatsController extends Controller
             'currentMonthLabel' => $today->format('F Y'),
             'members' => $members,
             'stats' => [
-                'totalStudents' => $totalStudents > 0 ? $totalStudents : 56,
-                'activeStudents' => $activeStudents > 0 ? $activeStudents : 43,
-                'inactiveStudents' => ($totalStudents - $activeStudents) > 0 ? ($totalStudents - $activeStudents) : 13,
-                'totalClasses' => $classes->count() > 0 ? $classes->count() : 11,
-                'studentGrowth' => 8,
-                'activeGrowth' => 77,
-                'inactiveGrowth' => -23,
+                'totalStudents' => $totalStudents,
+                'activeStudents' => $activeStudents,
+                'pendingStudents' => $pendingStudents,
+                'inactiveStudents' => $inactiveStudents,
+                'totalClasses' => $classes->count(),
+                'totalTeachers' => $tenant->users()->wherePivotIn('role', [Tenant::ROLE_STAFF, Tenant::ROLE_MEMBER])->count(),
+                'totalSections' => \Illuminate\Support\Facades\Schema::hasTable('student_sections')
+                    ? \App\Models\StudentSection::count()
+                    : 0,
+                'totalBranches' => \Illuminate\Support\Facades\Schema::hasTable('branches')
+                    ? Branch::where('madrasa_id', $tenant->id)->count()
+                    : 0,
+                'studentGrowth' => 0,
+                'activeGrowth' => $totalStudents > 0 ? round(($activeStudents / $totalStudents) * 100, 1) : 0,
+                'inactiveGrowth' => $totalStudents > 0 ? round(($inactiveStudents / $totalStudents) * 100, 1) : 0,
                 'classGrowth' => 0,
                 'presentToday' => $presentToday,
                 'absentToday' => $absentToday,
@@ -220,9 +218,13 @@ class DashboardStatsController extends Controller
             ],
             'classes' => $classes,
             'notices' => $notices,
+            'absentStudents' => $absentStudents,
+            'upcomingExams' => $upcomingExams,
+            'recentPayments' => $recentPayments,
             'students' => $studentsList,
             'activities' => $activities,
             'attendanceTrend' => $trend,
+            'filters' => $filters,
         ]);
     }
 }

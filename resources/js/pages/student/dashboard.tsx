@@ -42,6 +42,8 @@ export type Props = Record<string, unknown> & {
         name: string;
         class: string;
         roll: string;
+        admissionNumber: string | null;
+        academicYear: string | null;
         photo: string | null;
     };
     kpis: {
@@ -178,6 +180,7 @@ export type Props = Record<string, unknown> & {
         hall: string | null;
     }[];
     hifz: {
+        enrolled: boolean;
         parasDone: number;
         today: {
             id: number;
@@ -492,10 +495,12 @@ export default function StudentDashboard(props: Props) {
                             <SectionTitle>{t.fees}</SectionTitle>
                             <FeeWidget fees={props.fees} t={t} />
                         </section>
-                        <section id="hifz" className={panel}>
-                            <SectionTitle>{t.hifz}</SectionTitle>
-                            <HifzDiary hifz={props.hifz} t={t} />
-                        </section>
+                        {props.hifz.enrolled && (
+                            <section id="hifz" className={panel}>
+                                <SectionTitle>{t.hifz}</SectionTitle>
+                                <HifzDiary hifz={props.hifz} t={t} />
+                            </section>
+                        )}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

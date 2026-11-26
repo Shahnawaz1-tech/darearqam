@@ -61,6 +61,25 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
     const isMobile = useIsMobile();
     const getInitials = useInitials();
     const [currentTime, setCurrentTime] = useState<string>(() => formatHeaderDateTime(new Date()));
+    const [workspaceLang, setWorkspaceLang] = useState<'en' | 'ur'>('en');
+
+    useEffect(() => {
+        const saved = localStorage.getItem('lang');
+        if (saved === 'ur' || saved === 'en') {
+            setWorkspaceLang(saved);
+        }
+    }, []);
+
+    useEffect(() => {
+        document.documentElement.lang = workspaceLang;
+        document.documentElement.dir = workspaceLang === 'ur' ? 'rtl' : 'ltr';
+    }, [workspaceLang]);
+
+    function toggleWorkspaceLang() {
+        const next = workspaceLang === 'en' ? 'ur' : 'en';
+        setWorkspaceLang(next);
+        localStorage.setItem('lang', next);
+    }
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -81,7 +100,7 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
             <AppContent
                 variant="sidebar"
                 className="min-w-0 overflow-x-clip bg-[#f4f6fb]"
-                style={{ marginLeft: contentMargin }}
+                style={{ marginInlineStart: contentMargin }}
             >
                 {/* Clean Modern White Header matching image UI */}
                 <header className="sticky top-0 z-30 flex h-[66px] shrink-0 items-center justify-between border-b border-slate-200/90 bg-white px-4 text-slate-800 shadow-2xs sm:px-6 lg:px-8">
@@ -93,6 +112,14 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
 
                     {/* Right: Live status + Date/Time + Notifications + User Avatar */}
                     <div className="flex items-center gap-3 sm:gap-4">
+                        <button
+                            type="button"
+                            onClick={toggleWorkspaceLang}
+                            aria-label={workspaceLang === 'en' ? 'Switch to Urdu' : 'Switch to English'}
+                            className="flex h-9 items-center rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-600 shadow-2xs transition hover:bg-slate-50"
+                        >
+                            {workspaceLang === 'en' ? 'اردو' : 'EN'}
+                        </button>
                         {/* Live Status Pill */}
                         <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600">
                             <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />

@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -29,6 +30,12 @@ class Student extends Model
         'class_id', 'user_id', 'name', 'father_name', 'roll_number',
         'registration_number', 'date_of_birth', 'gender', 'phone',
         'address', 'photo', 'b_form', 'status', 'admission_date', 'session',
+        'admission_number', 'first_name', 'last_name', 'email', 'blood_group',
+        'nationality', 'religion', 'city', 'province', 'country', 'mother_name',
+        'guardian_name', 'guardian_relationship', 'guardian_phone', 'guardian_email',
+        'guardian_address', 'emergency_contact', 'academic_year', 'department',
+        'study_program', 'enrollment_type', 'previous_school', 'previous_class',
+        'assigned_teacher_id', 'branch_id', 'section_id', 'created_by', 'updated_by',
     ];
 
     protected $casts = [
@@ -75,6 +82,41 @@ class Student extends Model
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(StudentSection::class, 'section_id');
+    }
+
+    public function guardians(): HasMany
+    {
+        return $this->hasMany(StudentGuardian::class);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(StudentDocument::class);
+    }
+
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(StudentEnrollment::class);
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(StudentStatusHistory::class);
+    }
+
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(StudentActivityLog::class);
+    }
+
+    public function hifzEnrollment(): HasOne
+    {
+        return $this->hasOne(StudentHifzEnrollment::class);
     }
 
     public function scopeActive($query)

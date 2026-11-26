@@ -12,6 +12,10 @@ use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\StaffAttendanceController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\StudentProfileController;
+use App\Http\Controllers\Admin\StudentEnrollmentController;
+use App\Http\Controllers\Admin\ExamController;
+use App\Http\Controllers\Admin\HifzController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ResultController;
@@ -30,15 +34,15 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', WelcomeController::class)->name('home');
 
 // Public form endpoints — no auth required
-Route::post('contact', ContactController::class)->name('contact.send');
-Route::post('results/internal', [ResultController::class, 'internal'])->name('results.internal');
-Route::post('results/wifaq', [ResultController::class, 'wifaq'])->name('results.wifaq');
+Route::post('contact', ContactController::class)->middleware('throttle:10,1')->name('contact.send');
+Route::post('results/internal', [ResultController::class, 'internal'])->middleware('throttle:10,1')->name('results.internal');
+Route::post('results/wifaq', [ResultController::class, 'wifaq'])->middleware('throttle:10,1')->name('results.wifaq');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     // ── Admin-only module routes ──────────────────────────────────────────
-    Route::middleware(RequireTenantRole::class.':owner,admin')->group(function () {
+    Route::middleware(RequireTenantRole::class.':owner,admin,branch_admin,accountant')->group(function () {
         Route::get('clear', ClearApplicationCachesController::class)
             ->middleware('throttle:5,1')
             ->name('maintenance.clear');
@@ -65,6 +69,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('admin/students', [StudentController::class, 'store'])->name('admin.students.store');
         Route::patch('admin/students/{student}', [StudentController::class, 'update'])->name('admin.students.update');
         Route::delete('admin/students/{student}', [StudentController::class, 'destroy'])->name('admin.students.destroy');
+        Route::post('admin/students/{student}/restore', [StudentController::class, 'restore'])->name('admin.students.restore');
+        Route::get('admin/students/{student}', [StudentProfileController::class, 'show'])->name('admin.students.show');
+        Route::post('admin/students/{student}/documents', [StudentProfileController::class, 'storeDocument'])->name('admin.students.documents.store');
+        Route::delete('admin/students/{student}/documents/{document}', [StudentProfileController::class, 'destroyDocument'])->name('admin.students.documents.destroy');
+        Route::post('admin/students/{student}/promote', [StudentEnrollmentController::class, 'promote'])->name('admin.students.promote');
+        Route::post('admin/students/{student}/transfer', [StudentEnrollmentController::class, 'transfer'])->name('admin.students.transfer');
+        Route::post('admin/students/{student}/re-admit', [StudentEnrollmentController::class, 'reAdmit'])->name('admin.students.re-admit');
+        Route::post('admin/students/bulk-promote', [StudentEnrollmentController::class, 'bulkPromote'])->name('admin.students.bulk-promote');
+        Route::post('admin/exams', [ExamController::class, 'store'])->name('admin.exams.store');
+        Route::post('admin/exams/{exam}/results', [ExamController::class, 'storeResult'])->name('admin.exams.results.store');
+        Route::post('admin/exams/{exam}/publish', [ExamController::class, 'publish'])->name('admin.exams.publish');
+        Route::get('admin/exams/{exam}/students/{student}/report-card', [ExamController::class, 'reportCard'])->name('admin.exams.report-card');
+        Route::patch('admin/students/{student}/hifz/enrollment', [HifzController::class, 'updateEnrollment'])->name('admin.students.hifz.enrollment');
+        Route::post('admin/students/{student}/hifz/logs', [HifzController::class, 'storeLog'])->name('admin.students.hifz.logs.store');
 
         // Staff / teacher assignments
         Route::get('admin/staff', [StaffController::class, 'index'])->name('admin.staff.index');
@@ -81,6 +99,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Attendance
         Route::get('admin/attendance', [AttendanceController::class, 'index'])->name('admin.attendance.index');
         Route::post('admin/attendance', [AttendanceController::class, 'store'])->name('admin.attendance.store');
+        Route::get('admin/attendance/export', [AttendanceController::class, 'exportReport'])->name('admin.attendance.export');
         Route::delete('admin/attendance/{attendance}', [AttendanceController::class, 'destroy'])
             ->name('admin.attendance.destroy');
         Route::post('admin/attendance/staff', [StaffAttendanceController::class, 'store'])
@@ -93,6 +112,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('admin/fees', [FeeController::class, 'store'])->name('admin.fees.store');
         Route::patch('admin/fees/{fee}', [FeeController::class, 'update'])->name('admin.fees.update');
         Route::delete('admin/fees/{fee}', [FeeController::class, 'destroy'])->name('admin.fees.destroy');
+        Route::post('admin/fees/invoices/{invoice}/payments', [FeeController::class, 'recordPayment'])->name('admin.fees.payments.store');
+        Route::post('admin/fees/payments/{payment}/reverse', [FeeController::class, 'reversePayment'])->name('admin.fees.payments.reverse');
+        Route::post('admin/fees/invoices/{invoice}/discount', [FeeController::class, 'applyDiscount'])->name('admin.fees.discounts.store');
+        Route::get('admin/fees/export', [FeeController::class, 'exportReport'])->name('admin.fees.export');
 
         // Notices
         Route::get('admin/notices', [NoticeController::class, 'index'])->name('admin.notices.index');
@@ -134,6 +157,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('student/results', [StudentDashboardController::class, 'results'])
         ->middleware(RequireTenantRole::class.':student')
         ->name('student.results');
+    Route::get('student/exams/{exam}/report-card', [ExamController::class, 'reportCardForStudent'])
+        ->middleware(RequireTenantRole::class.':student')
+        ->name('student.exams.report-card');
     Route::get('student/fees', [StudentDashboardController::class, 'fees'])
         ->middleware(RequireTenantRole::class.':student')
         ->name('student.fees');

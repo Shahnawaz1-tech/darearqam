@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Exam;
+use App\Models\Student;
+use App\Models\Scopes\TenantScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -61,59 +64,88 @@ class ResultController extends Controller
 
     private function findInternal(string $roll, string $reg): ?array
     {
-        // TODO: query the results table, e.g.:
-        // return Result::with('subjects')
-        //     ->where('roll_number', $roll)
-        //     ->where('registration_number', $reg)
-        //     ->where('exam_type', 'internal')
-        //     ->first()
-        //     ?->toResultArray();
+        $students = Student::withoutGlobalScope(TenantScope::class)
+            ->where(function ($query) use ($roll): void {
+                $query->where('roll_number', $roll)
+                    ->orWhere('admission_number', $roll);
+            })
+            ->where(function ($query) use ($reg): void {
+                $query->where('registration_number', $reg)
+                    ->orWhere('admission_number', $reg);
+            })
+            ->with(['class:id,name'])
+            ->get();
 
-        // Demo record — remove once the database is wired up.
-        $demo = [
-            '2026-001' => [
-                'REG-2026-0001' => [
-                    'name'     => 'احمد علی',
-                    'father'   => 'محمد اکرم',
-                    'course'   => 'درسِ نظامی، سال اول',
-                    'subjects' => [
-                        ['name' => 'قرآن کریم', 'marks' => 98, 'total' => 100],
-                        ['name' => 'حدیث',       'marks' => 95, 'total' => 100],
-                        ['name' => 'فقہ',         'marks' => 97, 'total' => 100],
-                        ['name' => 'عربی',        'marks' => 96, 'total' => 100],
-                        ['name' => 'اردو',         'marks' => 94, 'total' => 100],
-                        ['name' => 'انگریزی',    'marks' => 100, 'total' => 100],
-                    ],
-                ],
-            ],
-        ];
+        if ($students->count() !== 1) {
+            return null;
+        }
+        $student = $students->first();
 
-        return $demo[$roll][$reg] ?? null;
+        $exam = Exam::withoutGlobalScope(TenantScope::class)
+            ->published()
+            ->where('tenant_id', $student->tenant_id)
+            ->where('class_id', $student->class_id)
+            ->whereIn('type', ['internal', 'midterm', 'annual', 'test'])
+            ->latest('exam_date')
+            ->first();
+
+        return $this->publishedResultData($student, $exam);
     }
 
     private function findWifaq(string $roll, string $reg): ?array
     {
-        // TODO: query the wifaq_results table or call the Wifaq API.
+        $students = Student::withoutGlobalScope(TenantScope::class)
+            ->where(function ($query) use ($roll): void {
+                $query->where('roll_number', $roll)
+                    ->orWhere('admission_number', $roll);
+            })
+            ->where(function ($query) use ($reg): void {
+                $query->where('registration_number', $reg)
+                    ->orWhere('admission_number', $reg);
+            })
+            ->with(['class:id,name'])
+            ->get();
 
-        // Demo record — remove once the database is wired up.
-        $demo = [
-            'WM-2026-001' => [
-                'WRG-2026-0001' => [
-                    'name'     => 'زید حسن',
-                    'father'   => 'حسن علی',
-                    'course'   => 'شہادۃ العالمیہ',
-                    'subjects' => [
-                        ['name' => 'قرآن کریم', 'marks' => 97, 'total' => 100],
-                        ['name' => 'حدیث',       'marks' => 96, 'total' => 100],
-                        ['name' => 'فقہ',         'marks' => 95, 'total' => 100],
-                        ['name' => 'عربی',        'marks' => 92, 'total' => 100],
-                        ['name' => 'منطق',        'marks' => 94, 'total' => 100],
-                        ['name' => 'تفسیر',      'marks' => 98, 'total' => 100],
-                    ],
-                ],
-            ],
+        if ($students->count() !== 1) {
+            return null;
+        }
+        $student = $students->first();
+
+        $exam = Exam::withoutGlobalScope(TenantScope::class)
+            ->published()
+            ->where('tenant_id', $student->tenant_id)
+            ->where('class_id', $student->class_id)
+            ->where('type', 'wifaq')
+            ->latest('exam_date')
+            ->first();
+
+        return $this->publishedResultData($student, $exam);
+    }
+
+    private function publishedResultData(Student $student, ?Exam $exam): ?array
+    {
+        if ($exam === null) {
+            return null;
+        }
+
+        $results = $student->results()
+            ->where('exam_id', $exam->id)
+            ->with('subject:id,name,total_marks')
+            ->get();
+
+        if ($results->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'name' => $student->name,
+            'father' => $student->father_name ?? '',
+            'course' => $student->class?->name ?? '',
+            'subjects' => $results->map(fn ($result): array => [
+                'name' => $result->subject?->name ?? '',
+                'marks' => (int) $result->marks_obtained,
+                'total' => (int) ($result->subject?->total_marks ?? 100),
+            ])->values()->all(),
         ];
-
-        return $demo[$roll][$reg] ?? null;
     }
 }

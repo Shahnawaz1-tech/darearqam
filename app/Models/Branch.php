@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'is_active'])]
+#[Fillable(['name', 'is_active', 'tenant_id'])]
 class Branch extends Model
 {
     /** @use HasFactory<BranchFactory> */

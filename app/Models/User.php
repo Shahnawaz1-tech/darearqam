@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -87,6 +88,38 @@ class User extends Authenticatable implements MustVerifyEmail
             ->whereKey($current->getKey())
             ->wherePivotIn('role', [Tenant::ROLE_OWNER, Tenant::ROLE_ADMIN])
             ->exists();
+    }
+
+    public function isTenantAccountant(): bool
+    {
+        $current = app(TenantContext::class)->current();
+
+        return $current !== null
+            && $this->tenants()
+                ->whereKey($current->getKey())
+                ->wherePivot('role', Tenant::ROLE_ACCOUNTANT)
+                ->exists();
+    }
+
+    public function isBranchAdmin(): bool
+    {
+        $current = app(TenantContext::class)->current();
+
+        return $current !== null
+            && $this->tenants()
+                ->whereKey($current->getKey())
+                ->wherePivot('role', Tenant::ROLE_BRANCH_ADMIN)
+                ->exists();
+    }
+
+    public function isBranchStaff(): bool
+    {
+        return in_array((string) $this->getAttribute('role'), ['branch_staff', 'staff'], true);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function getAvatarAttribute(): ?string

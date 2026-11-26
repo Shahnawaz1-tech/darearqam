@@ -11,11 +11,17 @@ class Exam extends Model
 {
     use BelongsToTenant;
 
-    protected $fillable = ['class_id', 'title', 'type', 'exam_date', 'session', 'is_published'];
+    protected $fillable = [
+        'class_id', 'title', 'type', 'exam_date', 'session', 'academic_year',
+        'starts_at', 'ends_at', 'hall', 'is_published', 'published_at',
+    ];
 
     protected $casts = [
         'exam_date'    => 'date',
         'is_published' => 'boolean',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+        'published_at' => 'datetime',
     ];
 
     public function class(): BelongsTo

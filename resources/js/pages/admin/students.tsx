@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ChevronLeft,
     ChevronRight,
@@ -14,12 +14,16 @@ import React, { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
     destroy,
     index,
+    restore,
     store,
     update,
 } from '@/actions/App/Http/Controllers/Admin/StudentController';
+import { show } from '@/actions/App/Http/Controllers/Admin/StudentProfileController';
+import { bulkPromote } from '@/actions/App/Http/Controllers/Admin/StudentEnrollmentController';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,9 +32,12 @@ interface Student {
     name: string;
     father_name: string | null;
     roll_number: string | null;
+    admission_number: string | null;
+    gender: string;
     status: string;
     class: { id: number; name: string } | null;
     admitted_at: string | null;
+    deleted_at: string | null;
 }
 
 interface ClassOption {
@@ -65,6 +72,10 @@ interface Filters {
     search?: string;
     class_id?: string;
     status?: string;
+    gender?: string;
+    academic_year?: string;
+    hifz?: string;
+    trashed?: string;
 }
 
 interface Props extends Record<string, unknown> {
@@ -100,9 +111,13 @@ interface FormErrors {
 
 const statusBadge: Record<string, string> = {
     active: 'bg-emerald-100 text-emerald-700',
+    pending_admission: 'bg-amber-100 text-amber-700',
     inactive: 'bg-slate-100 text-slate-600',
+    suspended: 'bg-orange-100 text-orange-700',
+    transferred: 'bg-purple-100 text-purple-700',
     graduated: 'bg-blue-100 text-blue-700',
     dropped: 'bg-red-100 text-red-600',
+    withdrawn: 'bg-red-100 text-red-600',
 };
 
 const emptyForm: StudentFormData = {
@@ -133,7 +148,7 @@ function formDataFromStudent(s: Student): StudentFormData {
         father_name: s.father_name ?? '',
         class_id: s.class?.id.toString() ?? '',
         roll_number: s.roll_number ?? '',
-        gender: '',
+        gender: s.gender,
         status: s.status,
         admission_date: s.admitted_at ? s.admitted_at.split('T')[0] : '',
         session: '',
@@ -235,9 +250,13 @@ function StudentFormFields({
                     {...field('status')}
                 >
                     <option value="active">Active</option>
+                    <option value="pending_admission">Pending Admission</option>
                     <option value="inactive">Inactive</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="transferred">Transferred</option>
                     <option value="graduated">Graduated</option>
                     <option value="dropped">Dropped</option>
+                    <option value="withdrawn">Withdrawn</option>
                 </select>
                 <InputError message={errors.status} className="mt-1" />
             </div>
@@ -287,6 +306,8 @@ export default function Students({
     const [search, setSearch] = useState(filters.search ?? '');
     const [classId, setClassId] = useState(filters.class_id ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
+    const [trashed, setTrashed] = useState(filters.trashed ?? '0');
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
     // ── Filter helpers ──────────────────────────────────────────────────────
 
@@ -295,6 +316,7 @@ export default function Students({
             search: search || undefined,
             class_id: classId || undefined,
             status: status || undefined,
+            trashed: trashed === '1' ? '1' : undefined,
             ...overrides,
         };
         // Remove empty keys
@@ -334,10 +356,33 @@ export default function Students({
         setSearch('');
         setClassId('');
         setStatus('');
+        setTrashed('0');
         router.get(index.url(), {}, { preserveState: true, replace: true });
     }
 
-    const hasFilters = search || classId || status;
+    function toggleSelected(id: number) {
+        setSelectedIds((ids) =>
+            ids.includes(id) ? ids.filter((selectedId) => selectedId !== id) : [...ids, id],
+        );
+    }
+
+    function bulkPromoteSelected() {
+        if (selectedIds.length === 0) return;
+
+        const targetClassId = window.prompt('Enter target class ID');
+        const academicYear = window.prompt('Enter target academic year');
+        if (!targetClassId || !academicYear) return;
+
+        router.post(bulkPromote.url(), {
+            student_ids: selectedIds,
+            class_id: targetClassId,
+            academic_year: academicYear,
+        }, {
+            onSuccess: () => setSelectedIds([]),
+        });
+    }
+
+    const hasFilters = search || classId || status || trashed === '1';
 
     const groupedStudents = new Map<number | null, Student[]>();
     students.data.forEach((student) => {
@@ -431,9 +476,13 @@ export default function Students({
     // ── Delete ──────────────────────────────────────────────────────────────
 
     function deleteStudent(id: number, name: string) {
-        if (!window.confirm(`Delete student "${name}"? This cannot be undone.`))
+        if (!window.confirm(`Archive student "${name}"? You can restore this record later.`))
             return;
         router.delete(destroy.url({ student: id }));
+    }
+
+    function restoreStudent(id: number) {
+        router.post(restore.url({ student: id }));
     }
 
     // ── Pagination ──────────────────────────────────────────────────────────
@@ -462,18 +511,25 @@ export default function Students({
                             </span>
                         </div>
                     </div>
-                    <Button
-                        type="button"
-                        onClick={() => setShowAdd((v) => !v)}
-                        className="bg-[#1d5140] text-white hover:bg-[#173f34]"
-                    >
-                        {showAdd ? (
-                            <X className="size-4" aria-hidden="true" />
-                        ) : (
-                            <PlusCircle className="size-4" aria-hidden="true" />
+                    <div className="flex gap-2">
+                        {selectedIds.length > 0 && (
+                            <Button type="button" variant="outline" onClick={bulkPromoteSelected}>
+                                Promote {selectedIds.length} selected
+                            </Button>
                         )}
-                        {showAdd ? 'Cancel' : 'Add Student'}
-                    </Button>
+                        <Button
+                            type="button"
+                            onClick={() => setShowAdd((v) => !v)}
+                            className="bg-[#1d5140] text-white hover:bg-[#173f34]"
+                        >
+                            {showAdd ? (
+                                <X className="size-4" aria-hidden="true" />
+                            ) : (
+                                <PlusCircle className="size-4" aria-hidden="true" />
+                            )}
+                            {showAdd ? 'Cancel' : 'Add Student'}
+                        </Button>
+                    </div>
                 </div>
 
                 {/* ── Class overview ──────────────────────────────────────── */}
@@ -660,10 +716,27 @@ export default function Students({
                     >
                         <option value="">All Statuses</option>
                         <option value="active">Active</option>
+                        <option value="pending_admission">Pending Admission</option>
                         <option value="inactive">Inactive</option>
+                        <option value="suspended">Suspended</option>
+                        <option value="transferred">Transferred</option>
                         <option value="graduated">Graduated</option>
                         <option value="dropped">Dropped</option>
+                        <option value="withdrawn">Withdrawn</option>
                     </select>
+
+                    <label className="flex h-9 items-center gap-2 rounded-md border border-input px-3 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={trashed === '1'}
+                            onChange={(event) => {
+                                const value = event.target.checked ? '1' : '0';
+                                setTrashed(value);
+                                applyFilters({ trashed: value === '1' ? '1' : undefined });
+                            }}
+                        />
+                        Archived
+                    </label>
 
                     {/* Clear filters */}
                     {hasFilters && (
@@ -716,6 +789,9 @@ export default function Students({
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                                    <th className="w-10 px-3 py-3">
+                                        <span className="sr-only">Select</span>
+                                    </th>
                                     <th className="px-5 py-3">Roll #</th>
                                     <th className="px-4 py-3">Name</th>
                                     <th className="hidden px-4 py-3 md:table-cell">
@@ -734,19 +810,30 @@ export default function Students({
                                 {studentGroups.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={6}
-                                            className="px-5 py-12 text-center text-sm text-slate-400"
+                                            colSpan={7}
+                                            className="px-5 py-6"
                                         >
-                                            No students found.
-                                            {hasFilters && (
-                                                <button
-                                                    type="button"
-                                                    className="ml-2 text-[#1d5140] underline"
-                                                    onClick={clearFilters}
-                                                >
-                                                    Clear filters
-                                                </button>
-                                            )}
+                                            <EmptyState
+                                                icon={UsersRound}
+                                                title="No students found"
+                                                description={
+                                                    hasFilters
+                                                        ? 'Try clearing the active filters or add a new student.'
+                                                        : 'Add your first student to start managing admissions.'
+                                                }
+                                                action={
+                                                    hasFilters ? (
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={clearFilters}
+                                                        >
+                                                            Clear filters
+                                                        </Button>
+                                                    ) : undefined
+                                                }
+                                            />
                                         </td>
                                     </tr>
                                 ) : (
@@ -757,7 +844,7 @@ export default function Students({
                                             <tr className="bg-[#1d5140]/[0.04]">
                                                 <th
                                                     scope="rowgroup"
-                                                    colSpan={6}
+                                                    colSpan={7}
                                                     className="border-y border-[#1d5140]/10 px-5 py-2.5 text-left"
                                                 >
                                                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -781,12 +868,26 @@ export default function Students({
                                                     <tr
                                                         className={`transition-colors hover:bg-slate-50/60 ${editingId === student.id ? 'bg-emerald-50/40' : ''}`}
                                                     >
+                                                        <td className="w-10 px-3 py-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedIds.includes(student.id)}
+                                                                onChange={() => toggleSelected(student.id)}
+                                                                aria-label={`Select ${student.name}`}
+                                                            />
+                                                        </td>
                                                         <td className="px-5 py-3 font-mono text-xs text-slate-500">
-                                                            {student.roll_number ??
+                                                            {student.admission_number ??
+                                                                student.roll_number ??
                                                                 '—'}
                                                         </td>
                                                         <td className="px-4 py-3 font-medium text-[#183b32]">
-                                                            {student.name}
+                                                            <Link
+                                                                href={show.url({ student: student.id })}
+                                                                className="font-semibold hover:underline"
+                                                            >
+                                                                {student.name}
+                                                            </Link>
                                                         </td>
                                                         <td className="hidden px-4 py-3 text-slate-500 md:table-cell">
                                                             {student.father_name ??
@@ -840,29 +941,44 @@ export default function Students({
                                                                         Edit
                                                                     </Button>
                                                                 )}
-                                                                <Button
-                                                                    type="button"
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() =>
-                                                                        deleteStudent(
-                                                                            student.id,
-                                                                            student.name,
-                                                                        )
-                                                                    }
-                                                                    className="text-red-500 hover:bg-red-50 hover:text-red-700"
-                                                                >
-                                                                    <Trash2
-                                                                        className="size-3.5"
-                                                                        aria-hidden="true"
-                                                                    />
-                                                                    <span className="sr-only">
-                                                                        Delete{' '}
-                                                                        {
-                                                                            student.name
+                                                                {student.deleted_at ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() =>
+                                                                            restoreStudent(
+                                                                                student.id,
+                                                                            )
                                                                         }
-                                                                    </span>
-                                                                </Button>
+                                                                    >
+                                                                        Restore
+                                                                    </Button>
+                                                                ) : (
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() =>
+                                                                            deleteStudent(
+                                                                                student.id,
+                                                                                student.name,
+                                                                            )
+                                                                        }
+                                                                        className="text-red-500 hover:bg-red-50 hover:text-red-700"
+                                                                    >
+                                                                        <Trash2
+                                                                            className="size-3.5"
+                                                                            aria-hidden="true"
+                                                                        />
+                                                                        <span className="sr-only">
+                                                                            Archive{' '}
+                                                                            {
+                                                                                student.name
+                                                                            }
+                                                                        </span>
+                                                                    </Button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -871,7 +987,7 @@ export default function Students({
                                                         student.id && (
                                                         <tr>
                                                             <td
-                                                                colSpan={6}
+                                                                colSpan={7}
                                                                 className="border-t border-[#1d5140]/10 bg-emerald-50/60 px-5 py-5"
                                                             >
                                                                 <form

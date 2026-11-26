@@ -27,7 +27,7 @@ return new class extends Migration
             $table->string('b_form', 20)->nullable();
 
             // Status
-            $table->enum('status', ['active', 'inactive', 'graduated', 'dropped'])->default('active');
+            $table->string('status', 30)->default('active');
             $table->date('admission_date')->nullable();
             $table->string('session', 20)->nullable(); // "2026"
 

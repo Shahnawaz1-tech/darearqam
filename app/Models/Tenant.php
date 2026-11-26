@@ -25,6 +25,10 @@ class Tenant extends Model
 
     public const ROLE_PARENT = 'parent';
 
+    public const ROLE_ACCOUNTANT = 'accountant';
+
+    public const ROLE_BRANCH_ADMIN = 'branch_admin';
+
     /**
      * @return BelongsToMany<User, $this, TenantMembership, 'pivot'>
      */

@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
+use App\Models\StudentHifzEnrollment;
+use App\Models\StudentHifzMonthlySummary;
 use App\Models\Tenant;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -68,11 +69,7 @@ class DashboardController extends Controller
         $student = Student::query()->where('user_id', $request->user()->id)->first();
         abort_unless($student !== null, 403);
 
-        $props = Cache::remember(
-            "student-dashboard:v3:{$tenant->id}:{$student->id}",
-            now()->addSeconds(15),
-            fn (): array => $this->normalizeDashboardPayload($this->dashboardData($student, $tenant)),
-        );
+        $props = $this->normalizeDashboardPayload($this->dashboardData($student, $tenant));
 
         return Inertia::render(
             $section === null ? 'student/dashboard' : 'student/section',
@@ -266,18 +263,61 @@ class DashboardController extends Controller
             ->orderBy('e.exam_date')->limit(12)->get(['e.id', 'e.title', 'e.exam_date', 'es.subject', 'es.time', 'es.hall'])
             ->map(fn ($exam): array => ['id' => (int) $exam->id, 'title' => $exam->title, 'date' => $exam->exam_date, 'subject' => $exam->subject, 'time' => $exam->time, 'hall' => $exam->hall])->values() : collect();
 
-        $hifzLogs = DB::table('hifz_logs')->leftJoin('users as u', 'u.id', '=', 'hifz_logs.teacher_id')
-            ->where('hifz_logs.tenant_id', $tenantId)->where('hifz_logs.student_id', $studentId)->orderByDesc('hifz_logs.date')->limit(12)
-            ->get(['hifz_logs.id', 'hifz_logs.date', 'hifz_logs.type', 'hifz_logs.from_ref', 'hifz_logs.to_ref', 'hifz_logs.rating', 'hifz_logs.remarks', 'u.name as teacher']);
-        $paras = [];
-        foreach ($hifzLogs as $log) {
-            if ($log->type === 'sabaq' && preg_match('/(?:پارہ|para)\s*(\d+)/iu', $log->from_ref, $match)) {
-                $paras[$match[1]] = true;
-            }
+        $hifzEnrollment = StudentHifzEnrollment::query()
+            ->where('student_id', $studentId)
+            ->first();
+        $hifzEnrolled = (bool) ($hifzEnrollment?->hifz_program);
+        $hifzLogs = collect();
+        $hifzMonthly = collect();
+
+        if ($hifzEnrolled) {
+            $hifzLogs = DB::table('hifz_logs')->leftJoin('users as u', 'u.id', '=', 'hifz_logs.teacher_id')
+                ->where('hifz_logs.tenant_id', $tenantId)
+                ->where('hifz_logs.student_id', $studentId)
+                ->orderByDesc('hifz_logs.date')
+                ->limit(12)
+                ->get([
+                    'hifz_logs.id', 'hifz_logs.date', 'hifz_logs.type',
+                    'hifz_logs.surah', 'hifz_logs.ayat_from', 'hifz_logs.ayat_to',
+                    'hifz_logs.sabaq_para', 'hifz_logs.sabaq_revision',
+                    'hifz_logs.from_ref', 'hifz_logs.to_ref', 'hifz_logs.rating',
+                    'hifz_logs.remarks', 'u.name as teacher',
+                ]);
+            $hifzMonthly = StudentHifzMonthlySummary::where('student_id', $studentId)
+                ->orderBy('month')
+                ->limit(12)
+                ->get();
         }
+
+        $paras = $hifzLogs
+            ->pluck('sabaq_para')
+            ->merge($hifzLogs->pluck('from_ref'))
+            ->filter()
+            ->unique()
+            ->count();
         $hifz = [
-            'parasDone' => count($paras), 'today' => $hifzLogs->filter(fn ($log) => $log->date === $today->toDateString())->map(fn ($log): array => ['id' => (int) $log->id, 'type' => $log->type, 'from' => $log->from_ref, 'to' => $log->to_ref, 'rating' => $log->rating, 'remarks' => $log->remarks, 'teacher' => $log->teacher ?? ''])->values(),
-            'recent' => $hifzLogs->map(fn ($log): array => ['id' => (int) $log->id, 'date' => $log->date, 'type' => $log->type, 'from' => $log->from_ref, 'to' => $log->to_ref, 'rating' => $log->rating, 'remarks' => $log->remarks, 'teacher' => $log->teacher ?? ''])->values(),
+            'enrolled' => $hifzEnrolled,
+            'parasDone' => $paras,
+            'today' => $hifzLogs->filter(fn ($log) => $log->date === $today->toDateString())->map(fn ($log): array => [
+                'id' => (int) $log->id,
+                'type' => $log->type,
+                'from' => $log->from_ref ?? $log->sabaq_para ?? $log->surah ?? '',
+                'to' => $log->to_ref ?? $log->ayat_to ?? '',
+                'rating' => $log->rating,
+                'remarks' => $log->remarks,
+                'teacher' => $log->teacher ?? '',
+            ])->values(),
+            'recent' => $hifzLogs->map(fn ($log): array => [
+                'id' => (int) $log->id,
+                'date' => $log->date,
+                'type' => $log->type,
+                'from' => $log->from_ref ?? $log->sabaq_para ?? $log->surah ?? '',
+                'to' => $log->to_ref ?? $log->ayat_to ?? '',
+                'rating' => $log->rating,
+                'remarks' => $log->remarks,
+                'teacher' => $log->teacher ?? '',
+            ])->values(),
+            'monthly' => $hifzMonthly,
         ];
 
         $notices = DB::table('notices')->where('tenant_id', $tenantId)->where('is_published', true)
@@ -294,7 +334,15 @@ class DashboardController extends Controller
         $stats = ['student' => $student->name, 'class' => $student->class?->name ?? '', 'roll' => $student->roll_number ?? '', 'average' => $latestPct, 'grade' => $resultGrade, 'trend' => round($latestPct - $previousPct, 1), 'todayClasses' => $upcoming->count(), 'nextClassMinutes' => $upcoming->first()['minutesUntil'] ?? null, 'dueHomework' => $homeworkPending->count(), 'overdueHomework' => $overdueHomework, 'points' => $pointsTotal, 'rank' => $rank];
 
         return [
-            'student' => ['id' => $studentId, 'name' => $student->name, 'class' => $student->class?->name ?? '', 'roll' => $student->roll_number ?? '', 'photo' => $student->photo ? Storage::disk('public')->url($student->photo) : null],
+            'student' => [
+                'id' => $studentId,
+                'name' => $student->name,
+                'class' => $student->class?->name ?? '',
+                'roll' => $student->roll_number ?? '',
+                'admissionNumber' => $student->admission_number ?? $student->registration_number,
+                'academicYear' => $student->academic_year ?? $student->session,
+                'photo' => $student->photo ? Storage::disk('public')->url($student->photo) : null,
+            ],
             'kpis' => $stats,
             'courses' => $courses->map(fn ($course): array => ['id' => (int) $course->id, 'title' => $course->title, 'teacher' => $course->teacher ?? '', 'progress' => (int) ($course->percent ?? 0), 'tags' => is_string($course->tags) ? json_decode($course->tags, true) ?: [] : ($course->tags ?? []), 'cover' => $course->cover_path ? Storage::disk('public')->url($course->cover_path) : null])->values(),
             'upcoming' => $upcoming,

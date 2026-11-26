@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     destroy as destroyStudentAttendance,
+    exportReport as exportAttendance,
     index as attendanceIndex,
     store as storeStudentAttendance,
 } from '@/actions/App/Http/Controllers/Admin/AttendanceController';
@@ -28,7 +29,7 @@ import {
     store as storeStaffAttendance,
 } from '@/actions/App/Http/Controllers/Admin/StaffAttendanceController';
 
-type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave' | 'half_day' | 'excused';
 type View = 'students' | 'staff';
 
 interface StudentRow extends Record<string, unknown> {
@@ -66,6 +67,7 @@ interface Props extends Record<string, unknown> {
         date: string;
         class_id: string;
         view: View;
+        session: string;
     };
 }
 
@@ -95,6 +97,20 @@ const STATUS_OPTIONS: {
         selectedClass: 'border-amber-500 bg-amber-500 text-white shadow-sm',
         idleClass:
             'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-400',
+    },
+    {
+        value: 'leave',
+        label: 'Leave',
+        selectedClass: 'border-violet-600 bg-violet-600 text-white shadow-sm',
+        idleClass:
+            'border-violet-200 bg-violet-50 text-violet-800 hover:border-violet-400',
+    },
+    {
+        value: 'half_day',
+        label: 'Half Day',
+        selectedClass: 'border-sky-600 bg-sky-600 text-white shadow-sm',
+        idleClass:
+            'border-sky-200 bg-sky-50 text-sky-800 hover:border-sky-400',
     },
     {
         value: 'excused',
@@ -251,6 +267,7 @@ export default function Attendance({
     const busy = saving || deleting;
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [view, setView] = useState<View>(filters.view);
+    const [session, setSession] = useState(filters.session ?? 'daily');
     const page = usePage();
     const errorMessages = [...new Set(collectErrorMessages(page.props.errors))];
 
@@ -324,12 +341,13 @@ export default function Attendance({
     }, [busy, hasChanges, startPolling, stopPolling]);
 
     function visitAttendance(
-        next: Partial<{ date: string; class_id: string; view: View }>,
+        next: Partial<{ date: string; class_id: string; view: View; session: string }>,
     ) {
         setSuccessMessage(null);
         const query = {
             date: next.date ?? date,
             view: next.view ?? view,
+            session: next.session ?? session,
             ...((next.class_id ?? filters.class_id)
                 ? { class_id: next.class_id ?? filters.class_id }
                 : {}),
@@ -354,7 +372,7 @@ export default function Attendance({
         setSuccessMessage(null);
         router.post(
             storeStudentAttendance.url(),
-            { date, attendance: changes },
+            { date, session, attendance: changes },
             {
                 preserveScroll: true,
                 onSuccess: () => setSuccessMessage('Student attendance saved.'),
@@ -477,6 +495,44 @@ export default function Attendance({
                                         className="h-8 w-[145px] border-0 bg-transparent p-0 text-sm text-white scheme-dark shadow-none focus-visible:ring-0"
                                     />
                                 </label>
+                                {view === 'students' && (
+                                    <select
+                                        value={session}
+                                        disabled={busy}
+                                        onChange={(event) => {
+                                            const value = event.target.value;
+                                            setSession(value);
+                                            visitAttendance({ session: value });
+                                        }}
+                                        aria-label="Attendance session"
+                                        className="h-11 min-w-36 rounded-xl border border-white/20 bg-white/10 px-3 text-sm text-white"
+                                    >
+                                        <option value="daily" className="text-slate-900">Daily</option>
+                                        <option value="morning" className="text-slate-900">Morning</option>
+                                        <option value="evening" className="text-slate-900">Evening</option>
+                                    </select>
+                                )}
+                                {view === 'students' && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-11 border-white/20 bg-white/10 text-white hover:bg-white/20"
+                                        onClick={() => {
+                                            const month = date.slice(0, 7);
+                                            const params = new URLSearchParams({
+                                                date_from: `${month}-01`,
+                                                date_to: date,
+                                                session,
+                                            });
+                                            if (filters.class_id) {
+                                                params.set('class_id', filters.class_id);
+                                            }
+                                            window.location.href = `${exportAttendance.url()}?${params.toString()}`;
+                                        }}
+                                    >
+                                        Export CSV
+                                    </Button>
+                                )}
                                 {view === 'students' && (
                                     <select
                                         value={filters.class_id}

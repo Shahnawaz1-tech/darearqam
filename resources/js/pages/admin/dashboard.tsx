@@ -53,6 +53,16 @@ interface Stats {
     totalStudents: number;
     activeStudents: number;
     inactiveStudents: number;
+    pendingStudents?: number;
+    presentToday?: number;
+    absentToday?: number;
+    lateToday?: number;
+    feeCollected?: number;
+    feePending?: number;
+    overdueCount?: number;
+    totalTeachers?: number;
+    totalSections?: number;
+    totalBranches?: number;
     totalClasses: number;
     studentGrowth: number;
     activeGrowth: number;
@@ -66,74 +76,26 @@ interface Props extends Record<string, unknown> {
     stats: Stats;
     students: StudentRow[];
     activities: ActivityItem[];
+    attendanceTrend: { day: string; rate: number }[];
+    classes: { id: number; name: string }[];
+    filters: { academic_year?: string; branch_id?: string; class_id?: string; date_from?: string; date_to?: string };
 }
 
 export default function AdminDashboard({
-    stats = {
-        totalStudents: 56,
-        activeStudents: 43,
-        inactiveStudents: 13,
-        totalClasses: 11,
-        studentGrowth: 8,
-        activeGrowth: 77,
-        inactiveGrowth: -23,
-        classGrowth: 0,
-    },
+    stats,
     students = [],
     activities = [],
+    attendanceTrend = [],
+    classes = [],
+    filters = {},
 }: Props) {
     const [searchStudent, setSearchStudent] = useState('');
     const [selectedClass, setSelectedClass] = useState('all');
     const [selectedStatus, setSelectedStatus] = useState('all');
+    const [academicYear, setAcademicYear] = useState(filters.academic_year ?? '');
+    const [dashboardClass, setDashboardClass] = useState(filters.class_id ?? '');
 
-    // Default students if empty to match image exactly
-    const initialStudents: StudentRow[] = students.length > 0 ? students : [
-        {
-            id: 1,
-            name: 'محمد عمر',
-            father_name: 'نور محمد',
-            class_name: 'حفظ - سابع',
-            roll_number: '#0015',
-            admission_date: '05 Jun 2024',
-            status: 'active',
-        },
-        {
-            id: 2,
-            name: 'سید میر',
-            father_name: 'اللہ بخش',
-            class_name: 'حفظ - سابع',
-            roll_number: '#0016',
-            admission_date: '20 Jan 2024',
-            status: 'active',
-        },
-        {
-            id: 3,
-            name: 'مصطفیٰ زبیر',
-            father_name: 'حسین خان',
-            class_name: 'ناظرہ',
-            roll_number: '#0017',
-            admission_date: '13 Jun 2024',
-            status: 'active',
-        },
-        {
-            id: 4,
-            name: 'حبیب الرحمن',
-            father_name: 'اسماعیل اللہ',
-            class_name: 'ناظرہ',
-            roll_number: '#0018',
-            admission_date: '09 Feb 2024',
-            status: 'active',
-        },
-        {
-            id: 5,
-            name: 'فیضان علی',
-            father_name: 'ظفر علی',
-            class_name: 'ناظرہ',
-            roll_number: '#0019',
-            admission_date: '09 Apr 2024',
-            status: 'active',
-        },
-    ];
+    const initialStudents: StudentRow[] = students;
 
     // Filter students
     const filteredStudents = initialStudents.filter((s) => {
@@ -141,46 +103,24 @@ export default function AdminDashboard({
             s.name.toLowerCase().includes(searchStudent.toLowerCase()) ||
             s.father_name.toLowerCase().includes(searchStudent.toLowerCase()) ||
             s.roll_number.toLowerCase().includes(searchStudent.toLowerCase());
-        const matchesClass = selectedClass === 'all' || s.class_name.includes(selectedClass);
+        const selectedClassName = classes.find((classOption) => String(classOption.id) === dashboardClass)?.name;
+        const matchesClass = selectedClass === 'all' || (selectedClassName ? s.class_name === selectedClassName : true);
         const matchesStatus = selectedStatus === 'all' || s.status.toLowerCase() === selectedStatus.toLowerCase();
         return matchesQuery && matchesClass && matchesStatus;
     });
 
-    // Default activities matching image
-    const initialActivities: ActivityItem[] = activities.length > 0 ? activities : [
-        {
-            id: 1,
-            title: 'New student added',
-            description: 'Ahmed Raza enrolled in Hifz Class',
-            time: '2m ago',
-            type: 'student',
-            color: 'emerald',
-        },
-        {
-            id: 2,
-            title: 'Attendance marked',
-            description: 'Class: Nazra Jamat 1',
-            time: '5m ago',
-            type: 'attendance',
-            color: 'blue',
-        },
-        {
-            id: 3,
-            title: 'Fee received',
-            description: 'Rs. 5,000 from Muhammad Ali',
-            time: '12m ago',
-            type: 'fee',
-            color: 'amber',
-        },
-        {
-            id: 4,
-            title: 'New notice published',
-            description: 'Annual Exam Schedule',
-            time: '1h ago',
-            type: 'notice',
-            color: 'purple',
-        },
-    ];
+    const initialActivities: ActivityItem[] = activities;
+    const peak = attendanceTrend.reduce(
+        (highest, point) => (point.rate > highest.rate ? point : highest),
+        attendanceTrend[0] ?? { day: '—', rate: 0 },
+    );
+
+    function applyDashboardFilters() {
+        router.get('/admin/dashboard', {
+            ...(academicYear ? { academic_year: academicYear } : {}),
+            ...(dashboardClass ? { class_id: dashboardClass } : {}),
+        }, { preserveScroll: true, replace: true });
+    }
 
     return (
         <>
@@ -496,10 +436,10 @@ export default function AdminDashboard({
 
                         {/* Line Chart Grid */}
                         <div className="my-3 relative h-48 w-full pt-4">
-                            {/* Peak Tooltip on Sat (95%) */}
+                            {/* Peak tooltip */}
                             <div className="absolute top-1 right-[22%] z-10 -translate-x-1/2">
                                 <span className="rounded-md bg-[#181a48] px-2 py-0.5 text-[11px] font-bold text-white shadow-md">
-                                    95%
+                                    {peak.rate.toFixed(0)}%
                                 </span>
                             </div>
 
@@ -565,13 +505,9 @@ export default function AdminDashboard({
 
                         {/* X-Axis Day Labels */}
                         <div className="flex justify-between pl-10 pr-2 pt-2 text-[11px] font-semibold text-slate-500">
-                            <span>Mon</span>
-                            <span>Tue</span>
-                            <span>Wed</span>
-                            <span>Thu</span>
-                            <span>Fri</span>
-                            <span>Sat</span>
-                            <span>Sun</span>
+                            {attendanceTrend.map((point) => (
+                                <span key={point.day}>{point.day}</span>
+                            ))}
                         </div>
                     </div>
 
@@ -658,15 +594,34 @@ export default function AdminDashboard({
 
                             {/* Filters & Actions */}
                             <div className="flex flex-wrap items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={academicYear}
+                                        onChange={(event) => setAcademicYear(event.target.value)}
+                                        onBlur={applyDashboardFilters}
+                                        placeholder="Academic year"
+                                        aria-label="Academic year"
+                                        className="h-8.5 w-28 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 text-xs"
+                                    />
                                 {/* All Classes Filter */}
                                 <select
-                                    value={selectedClass}
-                                    onChange={(e) => setSelectedClass(e.target.value)}
+                                    value={dashboardClass}
+                                    onChange={(event) => {
+                                        setDashboardClass(event.target.value);
+                                        setSelectedClass(event.target.value);
+                                        router.get('/admin/dashboard', {
+                                            ...(event.target.value ? { class_id: event.target.value } : {}),
+                                            ...(academicYear ? { academic_year: academicYear } : {}),
+                                        }, { preserveScroll: true, replace: true });
+                                    }}
                                     className="h-8.5 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#5b4bf7]"
                                 >
                                     <option value="all">All Classes</option>
-                                    <option value="حفظ">حفظ</option>
-                                    <option value="ناظرہ">ناظرہ</option>
+                                    {classes.map((classOption) => (
+                                        <option key={classOption.id} value={String(classOption.id)}>
+                                            {classOption.name}
+                                        </option>
+                                    ))}
                                 </select>
 
                                 {/* Status Filter */}
@@ -675,7 +630,9 @@ export default function AdminDashboard({
                                     onChange={(e) => setSelectedStatus(e.target.value)}
                                     className="h-8.5 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#5b4bf7]"
                                 >
-                                    <option value="all">Active</option>
+                                    <option value="all">All Statuses</option>
+                                    <option value="active">Active</option>
+                                    <option value="pending_admission">Pending</option>
                                     <option value="inactive">Inactive</option>
                                 </select>
 
@@ -694,6 +651,7 @@ export default function AdminDashboard({
                                 {/* Filter Button */}
                                 <button
                                     type="button"
+                                    onClick={applyDashboardFilters}
                                     className="flex h-8.5 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
                                 >
                                     <Filter className="size-3.5 text-slate-500" />
@@ -703,6 +661,12 @@ export default function AdminDashboard({
                                 {/* Export Button */}
                                 <button
                                     type="button"
+                                    onClick={() => {
+                                        const params = new URLSearchParams();
+                                        if (searchStudent) params.set('search', searchStudent);
+                                        if (dashboardClass && dashboardClass !== 'all') params.set('class_id', dashboardClass);
+                                        window.location.href = `/admin/students${params.size ? `?${params.toString()}` : ''}`;
+                                    }}
                                     className="flex h-8.5 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
                                 >
                                     <Download className="size-3.5 text-slate-500" />
@@ -778,9 +742,9 @@ export default function AdminDashboard({
 
                                             {/* Status */}
                                             <td className="py-3.5 px-3">
-                                                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
-                                                    <span className="size-1.5 rounded-full bg-emerald-500" />
-                                                    Active
+                                                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                                    <span className="size-1.5 rounded-full bg-slate-400" />
+                                                    {st.status.replace('_', ' ')}
                                                 </span>
                                             </td>
 

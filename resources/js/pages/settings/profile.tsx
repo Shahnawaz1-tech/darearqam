@@ -82,12 +82,6 @@ export default function Profile({
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar ?? null);
     const [isDragging, setIsDragging] = useState(false);
 
-    useEffect(() => {
-        if (!data.avatar) {
-            setAvatarPreview(user.avatar ?? null);
-        }
-    }, [user.avatar, data.avatar]);
-
     // Advanced preference states (saved in localStorage for persistence)
     const [emailAlerts, setEmailAlerts] = useState<boolean>(() => {
         return localStorage.getItem('pref_email_alerts') !== 'false';
@@ -125,6 +119,12 @@ export default function Profile({
         avatar: null,
         remove_avatar: false,
     });
+
+    useEffect(() => {
+        if (!data.avatar) {
+            setAvatarPreview(user.avatar ?? null);
+        }
+    }, [user.avatar, data.avatar]);
 
     // Update avatar preview when file chosen
     const handleFileChange = (file: File | undefined) => {
