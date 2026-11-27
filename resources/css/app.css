@@ -2,6 +2,9 @@
 
 @import 'tw-animate-css';
 
+/* ── Google Fonts: Inter + Noto Sans Arabic ─────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap');
+
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
@@ -12,6 +15,9 @@
         'Inter', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+
+    --font-arabic:
+        'Noto Sans Arabic', 'Traditional Arabic', 'Arial Unicode MS', serif;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -160,5 +166,43 @@
 
     body {
         @apply bg-background text-foreground;
+        font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    }
+
+    /* Smooth scrolling */
+    html {
+        scroll-behavior: smooth;
+    }
+}
+
+/* ── Utility: Arabic / Urdu font ──────────────────────────────── */
+@layer utilities {
+    .font-arabic {
+        font-family: var(--font-arabic, 'Noto Sans Arabic', 'Traditional Arabic', serif);
+        direction: rtl;
+        unicode-bidi: embed;
+    }
+
+    /* Smooth card hover transitions */
+    .card-hover {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card-hover:hover {
+        transform: translateY(-2px);
+    }
+
+    /* Premium scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #E7EAF2;
+        border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #cbd5e1;
     }
 }

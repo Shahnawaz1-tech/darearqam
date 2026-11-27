@@ -99,49 +99,51 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
             <AppSidebar />
             <AppContent
                 variant="sidebar"
-                className="min-w-0 overflow-x-clip bg-[#f4f6fb]"
+                className="min-w-0 overflow-x-clip bg-[#F5F7FC]"
                 style={{ marginInlineStart: contentMargin }}
             >
-                {/* Clean Modern White Header matching image UI */}
-                <header className="sticky top-0 z-30 flex h-[66px] shrink-0 items-center justify-between border-b border-slate-200/90 bg-white px-4 text-slate-800 shadow-2xs sm:px-6 lg:px-8">
+                {/* ── Premium Admin Header ── */}
+                <header className="sticky top-0 z-30 flex h-[62px] shrink-0 items-center justify-between border-b border-[#E7EAF2] bg-white/95 backdrop-blur-sm px-4 text-slate-800 shadow-sm sm:px-5 lg:px-6">
                     {/* Left: Sidebar Toggle + Search Input */}
                     <div className="flex min-w-0 items-center gap-3">
-                        <SidebarTrigger className="size-9 shrink-0 rounded-xl border border-slate-200 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 hover:text-slate-900" />
+                        <SidebarTrigger className="size-9 shrink-0 rounded-xl border border-[#E7EAF2] bg-white text-slate-500 shadow-sm transition-all hover:bg-[#F5F7FC] hover:text-[#071B49] hover:border-slate-300" />
                         <AdminHeaderSearch />
                     </div>
 
-                    {/* Right: Live status + Date/Time + Notifications + User Avatar */}
-                    <div className="flex items-center gap-3 sm:gap-4">
+                    {/* Right: controls */}
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        {/* Language toggle */}
                         <button
                             type="button"
                             onClick={toggleWorkspaceLang}
                             aria-label={workspaceLang === 'en' ? 'Switch to Urdu' : 'Switch to English'}
-                            className="flex h-9 items-center rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-600 shadow-2xs transition hover:bg-slate-50"
+                            className="flex h-8 items-center rounded-xl border border-[#E7EAF2] bg-white px-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:bg-[#F5F7FC] hover:border-slate-300"
                         >
                             {workspaceLang === 'en' ? 'اردو' : 'EN'}
                         </button>
-                        {/* Live Status Pill */}
-                        <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600">
+
+                        {/* Live status pill */}
+                        <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                             <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                             <span>Live</span>
                         </div>
 
-                        {/* Formatted Date & Time */}
-                        <div className="hidden text-xs font-medium text-slate-500 xl:inline-block">
+                        {/* Date & time */}
+                        <div className="hidden text-xs font-medium text-slate-400 xl:block">
                             {currentTime}
                         </div>
 
-                        {/* Real-time Notifications Bell */}
+                        {/* Notifications */}
                         <AdminHeaderNotifications />
 
-                        {/* User Profile Menu */}
+                        {/* Avatar */}
                         {user && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button
                                         type="button"
                                         aria-label={`Profile menu for ${user.name}`}
-                                        className="relative flex size-9.5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 p-0 text-slate-700 shadow-2xs transition-all hover:border-slate-300 hover:shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4bf7]"
+                                        className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#E7EAF2] bg-slate-100 p-0 shadow-sm transition-all hover:border-[#16A66A]/40 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16A66A]"
                                     >
                                         <Avatar className="size-full">
                                             <AvatarImage
@@ -149,7 +151,7 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
                                                 alt={user.name}
                                                 className="size-full object-cover"
                                             />
-                                            <AvatarFallback className="bg-gradient-to-tr from-violet-600 to-indigo-600 text-xs font-bold text-white">
+                                            <AvatarFallback className="bg-gradient-to-tr from-[#071B49] to-[#16A66A] text-xs font-black text-white">
                                                 {getInitials(user.name)}
                                             </AvatarFallback>
                                         </Avatar>
@@ -157,7 +159,7 @@ function LayoutFrame({ children }: { children: React.ReactNode }) {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
                                     align="end"
-                                    className="min-w-56 rounded-2xl p-1.5 shadow-2xl border-slate-200/90 dark:border-slate-800"
+                                    className="min-w-56 rounded-2xl p-1.5 shadow-2xl border-[#E7EAF2]"
                                 >
                                     <UserMenuContent user={user} />
                                 </DropdownMenuContent>
